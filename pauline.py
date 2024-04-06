@@ -29,10 +29,12 @@ async def pauline_batch(pauline_addr: str, floppy_names: list[str]):
                 floppy_name = f"rh{floppy_name}"
             filename = f"{datetime_str}_{OPERATOR_NAME}_{floppy_name}_{drive_name}"
             bar_outer.write(f"Dumping {floppy_name} ({num_str}): {filename}")
+            await send_ws(ws, f"sound {1000 + 100*floppy_index} 100")
             await send_ws(ws, "set MACINTOSH_GCR_MODE 0")
             await send_ws(ws, "index_to_dump 0")
             await send_ws(ws, "dump_time 800")
             try:
+                # static int readdisk(int drive, int dump_start_track,int dump_max_track,int dump_start_side,int dump_max_side,int high_res_mode,int doublestep,int ignore_index,int spy, char * name, char * comment, char * comment2, int start_index, int incmode, char * driveref, char * operator)
                 await send_ws(ws, f'dump {floppy_index} 0 {NUM_TRACKS} 0 1 0 0 0 0 "{filename}" "" 1 AUTO_INDEX_NAME "" "" ""')
                 bar = tqdm.tqdm(total=NUM_TRACKS, desc='track', leave=False)
                 bar.update(0)
@@ -59,7 +61,10 @@ async def pauline_batch(pauline_addr: str, floppy_names: list[str]):
         print("Returning heads...")
         for floppy_index in range(len(floppy_names)):
             await send_ws(ws, f"recalibrate {floppy_index}")
-            time.sleep(4)
+            time.sleep(4.5)
+        
+        await send_ws(ws, f"sound 2000 75")
+        await send_ws(ws, f"sound 2000 150")
     print("Done")
     # TODO read amount of space on SD card
 
