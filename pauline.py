@@ -23,6 +23,10 @@ async def pauline_batch(pauline_addr: str, floppy_names: list[str]):
         bar_outer = tqdm.tqdm(total=len(floppy_names), desc='floppy')
         bar_outer.update(0)
         for floppy_index, (floppy_name, drive_name) in enumerate(zip(floppy_names, FLOPPY_DRIVE_NAMES)):
+            if floppy_name == '-':
+                bar_outer.write(f"Skipping floppy in drive {floppy_index}")
+                bar_outer.update(1)
+                continue
             num_str = f"{floppy_index + 1}/{len(floppy_names)}"
             datetime_str = datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
             if not floppy_name.startswith('rh'):
@@ -63,8 +67,11 @@ async def pauline_batch(pauline_addr: str, floppy_names: list[str]):
             await send_ws(ws, f"recalibrate {floppy_index}")
             time.sleep(4.5)
         
-        await send_ws(ws, f"sound 2000 75")
-        await send_ws(ws, f"sound 2000 150")
+        await send_ws(ws, f"sound 2200 100")
+        time.sleep(0.1)
+        await send_ws(ws, f"sound 2200 100")
+        time.sleep(0.1)
+        await send_ws(ws, f"sound 2300 200")
     print("Done")
     # TODO read amount of space on SD card
 
