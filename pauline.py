@@ -22,11 +22,16 @@ async def pauline_batch(pauline_addr: str, floppy_names: list[str]):
     async with websockets.connect(f"ws://{pauline_addr}:8080") as ws:
         bar_outer = tqdm.tqdm(total=len(floppy_names), desc='floppy')
         bar_outer.update(0)
+        last_floppy_name = None
         for floppy_index, (floppy_name, drive_name) in enumerate(zip(floppy_names, FLOPPY_DRIVE_NAMES)):
             if floppy_name == '-':
                 bar_outer.write(f"Skipping floppy in drive {floppy_index}")
                 bar_outer.update(1)
                 continue
+            elif floppy_name == '+':
+                assert isinstance(last_floppy_name, str)
+                floppy_name = 'rh' + str(int(last_floppy_name.removeprefix('rh')) + 1)
+            
             num_str = f"{floppy_index + 1}/{len(floppy_names)}"
             datetime_str = datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
             if not floppy_name.startswith('rh'):
@@ -60,6 +65,7 @@ async def pauline_batch(pauline_addr: str, floppy_names: list[str]):
             except KeyboardInterrupt:
                 await send_ws(ws, 'stop')
                 raise
+            last_floppy_name = floppy_name
         
         bar_outer.close()
         print("Returning heads...")
