@@ -12,6 +12,8 @@ from sys import argv
 import websockets
 
 NUM_TRACKS = 82
+DUMP_TIME = 800
+#DUMP_TIME = 800*2
 
 
 async def send_ws(ws, msg: str) -> None:
@@ -31,6 +33,12 @@ async def pauline_batch(pauline_addr: str, floppy_names: list[str]):
             elif floppy_name == '+':
                 assert isinstance(last_floppy_name, str)
                 floppy_name = 'rh' + str(int(last_floppy_name.removeprefix('rh')) + 1)
+            elif floppy_name.lower() == 'clean':
+                bar_outer.write(f"Please insert cleaning floppy in drive {drive_name} (index {floppy_index}), then press RETURN")
+                input()
+                dump_time=400
+            else:
+                dump_time = DUMP_TIME
             
             num_str = f"{floppy_index + 1}/{len(floppy_names)}"
             datetime_str = datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
@@ -38,10 +46,13 @@ async def pauline_batch(pauline_addr: str, floppy_names: list[str]):
                 floppy_name = f"rh{floppy_name}"
             filename = f"{datetime_str}_{OPERATOR_NAME}_{floppy_name}_{drive_name}"
             bar_outer.write(f"Dumping {floppy_name} ({num_str}): {filename}")
+
+            # TODO first check with the last sector to see if reading isn't bad
+
             await send_ws(ws, f"sound {1000 + 100*floppy_index} 100")
             await send_ws(ws, "set MACINTOSH_GCR_MODE 0")
             await send_ws(ws, "index_to_dump 0")
-            await send_ws(ws, "dump_time 800")
+            await send_ws(ws, f"dump_time {dump_time}")
             try:
                 # static int readdisk(int drive, int dump_start_track,int dump_max_track,int dump_start_side,int dump_max_side,int high_res_mode,int doublestep,int ignore_index,int spy, char * name, char * comment, char * comment2, int start_index, int incmode, char * driveref, char * operator)
                 await send_ws(ws, f'dump {floppy_index} 0 {NUM_TRACKS} 0 1 0 0 0 0 "{filename}" "" 1 AUTO_INDEX_NAME "" "" ""')

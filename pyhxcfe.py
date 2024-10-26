@@ -11,9 +11,9 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from tqdm import tqdm
 
-HXCFE_BINARY_PATH = '../HxCFloppyEmulator_soft/HxCFloppyEmulator_Software/Windows_x64/hxcfe.exe'
+HXCFE_BINARY_PATH = '/home/sanqui/pauline/HxCFloppyEmulator_soft_beta/HxCFloppyEmulator_soft/HxCFloppyEmulator_Software/Windows_x64/hxcfe.exe'
 
-MAX_WORKERS=7
+MAX_WORKERS=12
 
 FORMATS = [
     ('GENERIC_XML', 'xml'),
