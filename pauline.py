@@ -1,17 +1,16 @@
 #!/usr/bin/env python
 
+from sys import argv
 import asyncio
 from dataclasses import dataclass
 import time
 import datetime
 import re
 import tqdm
-from config import FLOPPY_DRIVE_NAMES, OPERATOR_NAME
-from fabric import Connection
-
-from sys import argv
+import asyncssh
 
 import websockets
+from config import FLOPPY_DRIVE_NAMES, OPERATOR_NAME
 
 NUM_TRACKS = 82
 #DUMP_TIME = 440
@@ -29,15 +28,41 @@ class Pauline():
         self.ws = await websockets.connect(f"ws://{self.address}:8080")
 
         print("Connecting to ssh...")
-        self.ssh = Connection(self.address, user="pauline", connect_kwargs={"password": "pauline"})
+        self.ssh = await asyncssh.connect(self.address, username="pauline", password="pauline")
 
-        result = self.ssh.run("uname -s", hide=True)
-        assert result.ok
+        result = await self.ssh.run("uname -s", check=True)
+        assert result.stdout
         assert result.stdout.strip() == "Linux"
 
     async def send_ws(self, msg: str) -> None:
         await self.ws.send(msg)
         print(f">>> {msg}")
+    
+    async def return_heads(self, drives: list[int]):
+        print("Returning heads...")
+        for floppy_index in drives:
+            await self.send_ws(f"recalibrate {floppy_index}")
+            await asyncio.sleep(4.5)
+        
+        print("Returned heads")
+        await self.send_ws(f"sound 2200 100")
+        await asyncio.sleep(0.1)
+        await self.send_ws(f"sound 2200 100")
+        await asyncio.sleep(0.1)
+        await self.send_ws(f"sound 2300 200")
+    
+    async def upload_to_nas(self):
+        print("Uploading onto NAS")
+
+        result = await self.ssh.run("scp -P 7722 -r /home/pauline/Disks_Captures dumper@nas.herniarchiv.cz:dumps/pauline2/")
+
+        print(result)
+        print("Done uploading")
+
+        await self.ssh.run("mkdir -p /home/pauline/Disks_Captures_Done")
+        await self.ssh.run("mv /home/pauline/Disks_Captures/* /home/pauline/Disks_Captures_Done")
+
+        print("Moved done disks")
 
     async def run_batch(self, floppy_names: list[str]):
         await self.connect()
@@ -99,33 +124,17 @@ class Pauline():
             last_floppy_name = floppy_name
         
         bar_outer.close()
-        print("Returning heads...")
-        for floppy_index in range(len(floppy_names)):
-            await self.send_ws(f"recalibrate {floppy_index}")
-            time.sleep(4.5)
-        
-        await self.send_ws(f"sound 2200 100")
-        time.sleep(0.1)
-        await self.send_ws(f"sound 2200 100")
-        time.sleep(0.1)
-        await self.send_ws(f"sound 2300 200")
 
         print("Done dumping floppies")
-        print("Uploading onto NAS")
+        
+        await asyncio.gather(
+            self.return_heads(drives=list(range(len(floppy_names)))),
+            self.upload_to_nas()
+        )
 
-        result = self.ssh.run("scp -P 7722 -r /home/pauline/Disks_Captures dumper@nas.herniarchiv.cz:dumps/pauline2/")
-
-        print(result)
-        print("Done uploading")
-
-        self.ssh.run("mkdir -p /home/pauline/Disks_Captures_Done")
-        self.ssh.run("mv /home/pauline/Disks_Captures/* /home/pauline/Disks_Captures_Done")
-
-        print("Moved done disks")
-
-        await self.send_ws(f"sound 2550 200")
+        await self.send_ws("sound 2550 200")
         time.sleep(0.1)
-        await self.send_ws(f"sound 2550 400")
+        await self.send_ws("sound 2550 400")
 
         print("Finished completely")
 
