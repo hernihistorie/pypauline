@@ -1,3 +1,5 @@
 disk_captures
 config.py
 text2.xml
+__pycache__
+tmp
