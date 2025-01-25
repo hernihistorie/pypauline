@@ -8,6 +8,8 @@ import datetime
 import re
 import tqdm
 import asyncssh
+import os
+from pathlib import Path
 
 import websockets
 from config import FLOPPY_DRIVE_NAMES, OPERATOR_NAME
@@ -22,10 +24,14 @@ INVENTORY_CODE="hh"
 @dataclass
 class Pauline():
     address: str
+    
+    def __post_init__(self):
+        self.pending_tasks = set()
 
     async def connect(self):
-        print("Connecting to websocket...")
+        print("Connecting to websockets...")
         self.ws = await websockets.connect(f"ws://{self.address}:8080")
+        self.ws_image = await websockets.connect(f"ws://{self.address}:8081")
 
         print("Connecting to ssh...")
         self.ssh = await asyncssh.connect(self.address, username="pauline", password="pauline")
@@ -63,6 +69,34 @@ class Pauline():
         await self.ssh.run("mv /home/pauline/Disks_Captures/* /home/pauline/Disks_Captures_Done")
 
         print("Moved done disks")
+
+    async def save_track_image(self, output_dir: Path, filename_base: str, track: int, side: int) -> None:
+        try:
+            # Set 2 second timeout for the entire image retrieval operation
+            async with asyncio.timeout(2.0):
+                await self.ws_image.send("get_image")
+                image_data = await self.ws_image.recv()
+                
+                # Ensure the images directory exists
+                image_dir = output_dir / f"{filename_base}_images"
+                image_dir.mkdir(exist_ok=True)
+                
+                # Save the image
+                image_path = image_dir / f"track{track}.{side}.png"
+                with open(image_path, "wb") as f:
+                    f.write(image_data)
+        except TimeoutError:
+            print(f"Timeout while getting image for track {track}.{side}")
+        except Exception as e:
+            print(f"Error saving image for track {track}.{side}: {e}")
+
+    async def _save_track_image_wrapped(self, *args, **kwargs):
+        try:
+            await self.save_track_image(*args, **kwargs)
+        except Exception as e:
+            print(f"Background task error: {e}")
+        finally:
+            self.pending_tasks.remove(asyncio.current_task())
 
     async def run_batch(self, floppy_names: list[str]):
         await self.connect()
@@ -109,13 +143,26 @@ class Pauline():
                     # use regex to extract 37 and 0 from ...t_rh6791-0001/track37.0.hxcstream
                     match = re.search(r'/track(\d+)\.(\d+)\.hxcstream', message)
                     if match:
-                        #track = int(match.group(1))
-                        #side = int(match.group(2))
-                        #assert side < 2
-                        #progress = track + 0.5 * side
+                        track = int(match.group(1))
+                        side = int(match.group(2))
                         bar.update(0.5)
+                        # Save the track image after each track is completed
+                        # Create background task for image saving
+                        task = asyncio.create_task(
+                            self._save_track_image_wrapped(
+                                Path("images/"),
+                                filename,
+                                track,
+                                side
+                            )
+                        )
+                        self.pending_tasks.add(task)
                     if message.startswith('OK : Done...'):
                         break
+                # Wait for any remaining image saving tasks before continuing
+                if self.pending_tasks:
+                    bar.write("Waiting for remaining image saves to complete...")
+                    await asyncio.gather(*self.pending_tasks)
                 bar.close()
                 bar_outer.update(1)
             except KeyboardInterrupt:
