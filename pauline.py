@@ -27,6 +27,8 @@ DUMP_TIME = 800
 
 INVENTORY_CODE="hh"
 
+os.makedirs('images', exist_ok=True)
+
 class TrackImageViewer:
     def __init__(self):
         self.image_queue = Queue()
