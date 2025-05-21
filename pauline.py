@@ -22,12 +22,10 @@ from queue import Queue
 
 NUM_TRACKS = 82
 #DUMP_TIME = 440
-DUMP_TIME = 800
+DUMP_TIME = 100
 #DUMP_TIME = 800*2
 
 INVENTORY_CODE="hh"
-
-os.makedirs('images', exist_ok=True)
 
 class TrackImageViewer:
     def __init__(self):
@@ -70,7 +68,7 @@ class Pauline():
     
     def __post_init__(self):
         self.pending_tasks = set()
-        self.image_viewer = TrackImageViewer()
+        # self.image_viewer = TrackImageViewer()
 
     async def connect(self):
         print("Connecting to websockets...")
@@ -78,7 +76,12 @@ class Pauline():
         self.ws_image = await websockets.connect(f"ws://{self.address}:8081")
 
         print("Connecting to ssh...")
-        self.ssh = await asyncssh.connect(self.address, username="pauline", password="pauline")
+        self.ssh = await asyncssh.connect(
+            self.address,
+            username="pauline",
+            password="pauline",
+            known_hosts=None
+        )
 
         result = await self.ssh.run("uname -s", check=True)
         assert result.stdout
@@ -104,7 +107,13 @@ class Pauline():
     async def upload_to_nas(self):
         print("Uploading onto NAS")
 
-        result = await self.ssh.run("scp -P 7722 -r /home/pauline/Disks_Captures dumper@nas.herniarchiv.cz:dumps/pauline2/")
+        result = await self.ssh.run(
+            "scp -P 7722 -r /home/pauline/Disks_Captures dumper@nas.herniarchiv.cz:dumps/pauline2/",
+            check=True
+        )
+        if result.stderr and "update_known_hosts: hostfile_replace_entries failed" in str(result.stderr):
+            # This happens on Pauline because the filesystem doesn't support links.
+            print("Note: update_known_hosts failed, but this is not a problem.")
 
         print(result)
         print("Done uploading")
@@ -122,7 +131,7 @@ class Pauline():
                 image_data = await self.ws_image.recv()
                 
                 # Show image in viewer
-                self.image_viewer.show_image(image_data)
+                # self.image_viewer.show_image(image_data)
                 
                 # Ensure the images directory exists
                 image_dir = output_dir / f"{filename_base}_images"
@@ -195,15 +204,15 @@ class Pauline():
                         bar.update(0.5)
                         # Save the track image after each track is completed
                         # Create background task for image saving
-                        task = asyncio.create_task(
-                            self._save_track_image_wrapped(
-                                Path("images/"),
-                                filename,
-                                track,
-                                side
-                            )
-                        )
-                        self.pending_tasks.add(task)
+                        # task = asyncio.create_task(
+                        #     self._save_track_image_wrapped(
+                        #         Path("images/"),
+                        #         filename,
+                        #         track,
+                        #         side
+                        #     )
+                        # )
+                        # self.pending_tasks.add(task)
                     if message.startswith('OK : Done...'):
                         break
                 # Wait for any remaining image saving tasks before continuing

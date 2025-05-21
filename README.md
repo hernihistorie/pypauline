@@ -4,8 +4,10 @@ This repository contains tools to work with the open source floppy disk dumper [
 
 ## Dependencies
 
-Use `uv` to set up a virtual environment using `uv install`.  Then run scripts by prefixing `python` with `uv run`,
-or enter the virtualenv by using `uv shell`.
+We use uv to manage Python versions and dependencies.  Please make sure you have [uv installed](https://docs.astral.sh/uv/getting-started/installation/).
+
+Use `uv` to set up a virtual environment using `uv sync`.  Then run scripts by prefixing `python` with `uv run`,
+or enter the virtualenv by using `./venv/bin/activate`.
 
 ## config.py
 
