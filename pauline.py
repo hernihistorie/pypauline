@@ -1,6 +1,5 @@
 #!/usr/bin/env python
 
-from sys import argv
 import asyncio
 from dataclasses import dataclass
 import time
@@ -8,9 +7,9 @@ import datetime
 import re
 import tqdm
 import asyncssh
-import os
 from pathlib import Path
 
+import click
 import websockets
 from config import FLOPPY_DRIVE_NAMES, OPERATOR_NAME
 
@@ -246,6 +245,19 @@ class Pauline():
 
         print("Finished completely")
 
+@click.command()
+@click.argument('address')
+@click.argument('floppy_names', nargs=-1, required=True)
+def main(address: str, floppy_names: tuple[str, ...]):
+    """
+    Dump floppy disks using Pauline.
+    
+    ADDRESS: The IP address or hostname of the Pauline device
+    
+    Names of the floppies to dump (one or more). Use '-' to skip a drive, '+' to increment last name, 'clean' for cleaning disk.
+    """
+    pauline = Pauline(address=address)
+    asyncio.run(pauline.run_batch(floppy_names=list(floppy_names)))
+
 if __name__ == "__main__":
-    pauline = Pauline(address=argv[1])
-    asyncio.run(pauline.run_batch(floppy_names=argv[2:]))
+    main()
