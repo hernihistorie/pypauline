@@ -22,8 +22,8 @@ from queue import Queue
 
 NUM_TRACKS = 82
 #DUMP_TIME = 440
-DUMP_TIME = 100
-#DUMP_TIME = 800*2
+#DUMP_TIME = 100
+DUMP_TIME = 840
 
 INVENTORY_CODE="hh"
 
@@ -107,10 +107,15 @@ class Pauline():
     async def upload_to_nas(self):
         print("Uploading onto NAS")
 
-        result = await self.ssh.run(
-            "scp -P 7722 -r /home/pauline/Disks_Captures dumper@nas.herniarchiv.cz:dumps/pauline2/",
-            check=True
-        )
+        try:
+            result = await self.ssh.run(
+                "scp -P 7722 -r /home/pauline/Disks_Captures dumper@nas.herniarchiv.cz:dumps/pauline2/",
+                check=True
+            )
+        except asyncssh.process.ProcessError:
+            print("Warning: Uploading to NAS failed.  Does Pauline have internet connection?")
+            return
+
         if result.stderr and "update_known_hosts: hostfile_replace_entries failed" in str(result.stderr):
             # This happens on Pauline because the filesystem doesn't support links.
             print("Note: update_known_hosts failed, but this is not a problem.")
