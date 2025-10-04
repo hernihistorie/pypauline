@@ -8,10 +8,11 @@ import re
 import tqdm
 import asyncssh
 from pathlib import Path
+import getpass
 
 import click
 import websockets
-from config import FLOPPY_DRIVE_NAMES, OPERATOR_NAME
+from config import FLOPPY_DRIVE_NAMES
 
 import tkinter as tk
 from PIL import Image, ImageTk
@@ -158,7 +159,7 @@ class Pauline():
         finally:
             self.pending_tasks.remove(asyncio.current_task())
 
-    async def run_batch(self, floppy_names: list[str]):
+    async def run_batch(self, floppy_names: list[str], operator: str | None = None):
         await self.connect()
 
         bar_outer = tqdm.tqdm(total=len(floppy_names), desc='floppy')
@@ -183,7 +184,8 @@ class Pauline():
             datetime_str = datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
             if not floppy_name.startswith(INVENTORY_CODE):
                 floppy_name = f"{INVENTORY_CODE}{floppy_name}"
-            filename = f"{datetime_str}_{OPERATOR_NAME}_{floppy_name}_{drive_name}"
+            operator_name = operator if operator is not None else getpass.getuser()
+            filename = f"{datetime_str}_{operator_name}_{floppy_name}_{drive_name}"
             bar_outer.write(f"Dumping {floppy_name} ({num_str}): {filename}")
 
             # TODO first check with the last sector to see if reading isn't bad
@@ -248,7 +250,8 @@ class Pauline():
 @click.command()
 @click.argument('address')
 @click.argument('floppy_names', nargs=-1, required=True)
-def main(address: str, floppy_names: tuple[str, ...]):
+@click.option('--operator', default=None, help='Operator name (defaults to current system user)')
+def main(address: str, floppy_names: tuple[str, ...], operator: str | None):
     """
     Dump floppy disks using Pauline.
     
@@ -257,7 +260,7 @@ def main(address: str, floppy_names: tuple[str, ...]):
     Names of the floppies to dump (one or more). Use '-' to skip a drive, '+' to increment last name, 'clean' for cleaning disk.
     """
     pauline = Pauline(address=address)
-    asyncio.run(pauline.run_batch(floppy_names=list(floppy_names)))
+    asyncio.run(pauline.run_batch(floppy_names=list(floppy_names), operator=operator))
 
 if __name__ == "__main__":
     main()
