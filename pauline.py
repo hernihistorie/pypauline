@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 import asyncio
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import time
 import datetime
 import re
@@ -12,7 +12,6 @@ import getpass
 
 import click
 import websockets
-from config import FLOPPY_DRIVE_NAMES
 
 import tkinter as tk
 from PIL import Image, ImageTk
@@ -65,6 +64,8 @@ class TrackImageViewer:
 @dataclass
 class Pauline():
     address: str
+    config: str | None = None
+    drives: list[str] = field(default_factory=lambda: ['unkfd0', 'unkfd1', 'unkfd2', 'unkfd3', 'unkfd4', 'unkfd5'])
     
     def __post_init__(self):
         self.pending_tasks = set()
@@ -86,6 +87,32 @@ class Pauline():
         result = await self.ssh.run("uname -s", check=True)
         assert result.stdout
         assert result.stdout.strip() == "Linux"
+
+        config_result = await self.ssh.run("cat /home/pauline/Settings/drives.script", check=True)
+        assert isinstance(config_result.stdout, str)
+        self.config = config_result.stdout
+        
+        # parse config
+        for line in self.config.split('\n'):
+            line = line.strip()
+            if line.startswith('set'):
+                var = line.split(' ')[1]
+                val = ' '.join(line.split(' ')[2:])
+
+                if var == 'DRIVE_0_DESCRIPTION':
+                    self.drives[0] = val.strip('"')
+                elif var == 'DRIVE_1_DESCRIPTION':
+                    self.drives[1] = val.strip('"')
+                elif var == 'DRIVE_2_DESCRIPTION':
+                    self.drives[2] = val.strip('"')
+                elif var == 'DRIVE_3_DESCRIPTION':
+                    self.drives[3] = val.strip('"')
+                elif var == 'DRIVE_4_DESCRIPTION':
+                    self.drives[4] = val.strip('"')
+                elif var == 'DRIVE_5_DESCRIPTION':
+                    self.drives[5] = val.strip('"')
+
+        print(f"Connected. Parsed drives from config: {self.drives}")
 
     async def send_ws(self, msg: str) -> None:
         await self.ws.send(msg)
@@ -165,7 +192,7 @@ class Pauline():
         bar_outer = tqdm.tqdm(total=len(floppy_names), desc='floppy')
         bar_outer.update(0)
         last_floppy_name = None
-        for floppy_index, (floppy_name, drive_name) in enumerate(zip(floppy_names, FLOPPY_DRIVE_NAMES)):
+        for floppy_index, (floppy_name, drive_name) in enumerate(zip(floppy_names, self.drives)):
             if floppy_name == '-':
                 bar_outer.write(f"Skipping floppy in drive {floppy_index}")
                 bar_outer.update(1)

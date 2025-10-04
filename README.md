@@ -9,14 +9,6 @@ We use uv to manage Python versions and dependencies.  Please make sure you have
 Use `uv` to set up a virtual environment using `uv sync`.  Then run scripts by prefixing `python` with `uv run`,
 or enter the virtualenv by using `./venv/bin/activate`.
 
-## config.py
-
-Should have the following contents:
-```python
-FLOPPY_DRIVE_NAMES = ["fd1", "fd11", "fd8", "fd10", "fd4", "fd12"]
-OPERATOR_NAME = "yourname"
-```
-Provide the names for the floppy drives connected to your Pauline (these will be put in the directory name) and your own name.
 
 ## pauline.py
 
