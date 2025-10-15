@@ -161,7 +161,7 @@ class Pauline():
                 
                 try:
                     result = await self.ssh.run(
-                        f"scp -P 7722 -r {subdir} dumper@nas.herniarchiv.cz:dumps/pauline2/",
+                        f"scp -P 7722 -r {subdir} dumper@nas.herniarchiv.cz:dumps/pauline2/Disks_Captures/",
                         check=True
                     )
                     
