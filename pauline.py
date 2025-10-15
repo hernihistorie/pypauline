@@ -134,26 +134,59 @@ class Pauline():
     async def upload_to_nas(self):
         print("Uploading onto NAS")
 
+        # Get list of subdirectories in Disks_Captures
         try:
             result = await self.ssh.run(
-                "scp -P 7722 -r /home/pauline/Disks_Captures dumper@nas.herniarchiv.cz:dumps/pauline2/",
+                "find /home/pauline/Disks_Captures -mindepth 1 -maxdepth 1 -type d",
                 check=True
             )
+            if not result.stdout:
+                print("No directories to upload")
+                return
+            
+            subdirs = [d.strip() for d in result.stdout.strip().split('\n') if d.strip()]
+            
+            if not subdirs:
+                print("No directories to upload")
+                return
+            
+            # Create the destination directory first
+            await self.ssh.run("mkdir -p /home/pauline/Disks_Captures_Done")
+            
+            # Upload each subdirectory with progress bar
+            bar = tqdm.tqdm(total=len(subdirs), desc='Uploading')
+            for subdir in subdirs:
+                subdir_name = subdir.split('/')[-1]
+                bar.set_description(f'Uploading {subdir_name}')
+                
+                try:
+                    result = await self.ssh.run(
+                        f"scp -P 7722 -r {subdir} dumper@nas.herniarchiv.cz:dumps/pauline2/",
+                        check=True
+                    )
+                    
+                    if result.stderr and "update_known_hosts: hostfile_replace_entries failed" in str(result.stderr):
+                        # This happens on Pauline because the filesystem doesn't support links.
+                        # bar.write(f"Note: update_known_hosts failed for {subdir_name}, but this is not a problem.")
+                        pass
+                    
+                    bar.write(f"Uploaded {subdir_name}")
+                    
+                    await self.ssh.run(f"mv {subdir} /home/pauline/Disks_Captures_Done/")
+                    # bar.write(f"Moved {subdir_name} to Disks_Captures_Done")
+                    bar.update(1)
+                    
+                except asyncssh.process.ProcessError as e:
+                    bar.write(f"Warning: Failed to upload {subdir_name}: {e}")
+                    bar.update(1)
+                    continue
+            
+            bar.close()
+            print("Done uploading")
+            
         except asyncssh.process.ProcessError:
             print("Warning: Uploading to NAS failed.  Does Pauline have internet connection?")
             return
-
-        if result.stderr and "update_known_hosts: hostfile_replace_entries failed" in str(result.stderr):
-            # This happens on Pauline because the filesystem doesn't support links.
-            print("Note: update_known_hosts failed, but this is not a problem.")
-
-        print(result)
-        print("Done uploading")
-
-        await self.ssh.run("mkdir -p /home/pauline/Disks_Captures_Done")
-        await self.ssh.run("mv /home/pauline/Disks_Captures/* /home/pauline/Disks_Captures_Done")
-
-        print("Moved done disks")
 
     async def save_track_image(self, output_dir: Path, filename_base: str, track: int, side: int) -> None:
         try:
