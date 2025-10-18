@@ -27,6 +27,7 @@ FORMATS = [
     # ('ZXSPECTRUM_FDI', 'fdi'),
     # ('ZXSPECTRUM_TRD', 'trd'),
     # ('ZXSPECTRUM_SCL', 'scl'),
+    ('IMD_IMG', 'imd'),
     ('PNG_IMAGE', 'png'),
     ('PNG_STREAM_IMAGE', 'png'),
     ('PNG_DISK_IMAGE', 'png'),
@@ -322,6 +323,8 @@ def main(disk_captures_dir: Path, hxcfe_binary_path: Path, workers: int, redo: b
     DISK_CAPTURES_DIR: Directory containing floppy disk captures to process
     """
 
+    print(f"Using {workers} workers.")
+
     # If summary-only, just generate the summary and exit
     if summary_only:
         if output is None:
@@ -334,6 +337,8 @@ def main(disk_captures_dir: Path, hxcfe_binary_path: Path, workers: int, redo: b
     finished_dirs: list[Path] = []
 
     for floppy_dir in disk_captures_dir.iterdir():
+        if not floppy_dir.is_dir():
+            continue
         for floppy_subdir in floppy_dir.iterdir():
             if floppy_subdir.name.endswith("_parsed"):
                 continue
