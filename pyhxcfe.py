@@ -13,6 +13,7 @@ from datetime import datetime
 
 import click
 from tqdm import tqdm
+from python_imd.imd import Disk
 
 HXCFE_BINARY_PATH = Path('/home/sanqui/ha/HxCFloppyEmulator/build/hxcfe')
 WORKERS=16
@@ -89,6 +90,48 @@ def parse_generic_xml(xml_path: Path) -> dict:
         return {'error': str(e)}
 
 
+def parse_imd_file(imd_path: Path) -> dict:
+    """Parse IMD file and extract key information."""
+    try:
+        disk = Disk.from_file(str(imd_path))
+        
+        # Collect statistics
+        modes = set()
+        cylinders = set()
+        heads = set()
+        errors = 0
+        
+        for track in disk.tracks:
+            modes.add(track.mode)
+            cylinders.add(track.cylinder)
+            heads.add(track.head)
+            # Check for error records using the has_error attribute
+            for record in track.sector_data_records:
+                if hasattr(record, 'record_type') and hasattr(record.record_type, 'has_error'):
+                    if record.record_type.has_error:
+                        errors += 1
+        
+        # Format mode information
+        mode_names = [mode.name for mode in sorted(modes)]
+        
+        info = {
+            'imd_tracks': len(disk.tracks),
+            'imd_modes': ', '.join(mode_names),
+            'imd_cylinders': f"{min(cylinders)}-{max(cylinders)}" if cylinders else "N/A",
+            'imd_heads': ', '.join(map(str, sorted(heads))),
+            'imd_errors': errors,
+        }
+        return info
+    except Exception as e:
+        return {
+            'imd_tracks': 'N/A',
+            'imd_modes': 'N/A',
+            'imd_cylinders': 'N/A',
+            'imd_heads': 'N/A',
+            'imd_errors': f'Error: {str(e)}',
+        }
+
+
 def generate_html_summary(disk_captures_dir: Path, output_file: Path):
     """Generate HTML summary of all processed floppies."""
     
@@ -111,6 +154,12 @@ def generate_html_summary(disk_captures_dir: Path, output_file: Path):
             if info is None:
                 continue
             
+            # Parse IMD file if available
+            imd_path = floppy_subdir / "IMD_IMG.imd"
+            imd_info = {}
+            if imd_path.exists():
+                imd_info = parse_imd_file(imd_path)
+            
             # Extract metadata from directory name
             parent_name = floppy_subdir.parent.name
             
@@ -126,7 +175,8 @@ def generate_html_summary(disk_captures_dir: Path, output_file: Path):
                 'png_image': png_image if png_image.exists() else None,
                 'png_stream': png_stream if png_stream.exists() else None,
                 'png_disk': png_disk if png_disk.exists() else None,
-                **info
+                **info,
+                **imd_info
             })
     
     # Generate HTML
@@ -199,6 +249,13 @@ def generate_html_summary(disk_captures_dir: Path, output_file: Path):
         .png-links a:hover {
             background-color: #0b7dda;
         }
+        .imd-error {
+            color: #d32f2f;
+            font-weight: bold;
+        }
+        .imd-no-error {
+            color: #388e3c;
+        }
     </style>
 </head>
 <body>
@@ -223,6 +280,11 @@ def generate_html_summary(disk_captures_dir: Path, output_file: Path):
                 <th>Bitrate</th>
                 <th>RPM</th>
                 <th>CRC32</th>
+                <th>IMD Tracks</th>
+                <th>IMD Modes</th>
+                <th>IMD Cylinders</th>
+                <th>IMD Heads</th>
+                <th>IMD Errors</th>
             </tr>
         </thead>
         <tbody>
@@ -232,7 +294,7 @@ def generate_html_summary(disk_captures_dir: Path, output_file: Path):
         if 'error' in floppy:
             html += f"""            <tr>
                 <td>{floppy['parent_dir']}</td>
-                <td colspan="11" class="error">Error: {floppy['error']}</td>
+                <td colspan="16" class="error">Error: {floppy['error']}</td>
             </tr>
 """
         else:
@@ -249,10 +311,18 @@ def generate_html_summary(disk_captures_dir: Path, output_file: Path):
                 png_links_html += f'<a href="{rel_path}" target="_blank">Disk</a>'
             png_links_html += '</div>'
             
+            # Format IMD errors with styling
+            imd_errors_value = floppy.get('imd_errors', 'N/A')
+            if isinstance(imd_errors_value, str) and 'Error:' in imd_errors_value:
+                imd_errors_html = f'<span class="imd-error">{imd_errors_value}</span>'
+            elif imd_errors_value == 0:
+                imd_errors_html = f'<span class="imd-no-error">{imd_errors_value}</span>'
+            else:
+                imd_errors_html = f'<span class="imd-error">{imd_errors_value}</span>'
+            
             html += f"""            <tr>
                 <td>{floppy['parent_dir']}</td>
                 <td>{png_links_html}</td>
-                <td>{floppy['interface_mode']}</td>
                 <td>{floppy['file_size']}</td>
                 <td>{floppy['number_of_track']}</td>
                 <td>{floppy['number_of_side']}</td>
@@ -262,6 +332,11 @@ def generate_html_summary(disk_captures_dir: Path, output_file: Path):
                 <td>{floppy['bitrate']}</td>
                 <td>{floppy['rpm']}</td>
                 <td>{floppy['crc32']}</td>
+                <td>{floppy.get('imd_tracks', 'N/A')}</td>
+                <td>{floppy.get('imd_modes', 'N/A')}</td>
+                <td>{floppy.get('imd_cylinders', 'N/A')}</td>
+                <td>{floppy.get('imd_heads', 'N/A')}</td>
+                <td>{imd_errors_html}</td>
             </tr>
 """
     
@@ -332,6 +407,8 @@ def main(disk_captures_dir: Path, hxcfe_binary_path: Path, workers: int, redo: b
             output = disk_captures_dir / f"summary_{timestamp}.html"
         generate_html_summary(disk_captures_dir, output)
         return
+
+    print(f"Using {workers} workers.")
 
     dirs: list[Path] = []
     finished_dirs: list[Path] = []
