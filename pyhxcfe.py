@@ -8,11 +8,14 @@ import subprocess
 import shlex
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor, as_completed
+import sys
 import xml.etree.ElementTree as ET
 from datetime import datetime
+import uuid
 
 import click
 from tqdm import tqdm
+from events import Event, PyHXCFEERunStarted, PyHXCFERunId
 from python_imd.imd import Disk
 
 HXCFE_BINARY_PATH = Path('/home/sanqui/ha/HxCFloppyEmulator/build/hxcfe')
@@ -33,6 +36,10 @@ FORMATS = [
     ('PNG_STREAM_IMAGE', 'png'),
     ('PNG_DISK_IMAGE', 'png'),
 ]
+
+def emit_event(event: Event):
+    """Emit an event (currently just prints to stdout)."""
+    print(f"Event emitted: {event}")
 
 def process_directory(hxcfe_binary_path: Path, floppy_subdir: Path):
     parsed_dir = floppy_subdir.parent / (floppy_subdir.name + "_parsed_wip")
@@ -270,7 +277,6 @@ def generate_html_summary(disk_captures_dir: Path, output_file: Path):
             <tr>
                 <th>Parent Directory</th>
                 <th>PNG Images</th>
-                <th>Interface Mode</th>
                 <th>File Size</th>
                 <th>Tracks</th>
                 <th>Sides</th>
@@ -398,7 +404,14 @@ def main(disk_captures_dir: Path, hxcfe_binary_path: Path, workers: int, redo: b
     DISK_CAPTURES_DIR: Directory containing floppy disk captures to process
     """
 
-    print(f"Using {workers} workers.")
+    run_id = PyHXCFERunId(str(uuid.uuid7()))
+
+    emit_event(PyHXCFEERunStarted(
+        pyhxcfe_run_id=run_id,
+        command=sys.argv,
+        host=os.uname().nodename,
+        start_time=datetime.now().isoformat()
+    ))
 
     # If summary-only, just generate the summary and exit
     if summary_only:
