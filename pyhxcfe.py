@@ -15,6 +15,7 @@ from datetime import datetime
 import uuid
 
 import click
+from jinja2 import Environment, FileSystemLoader
 from tqdm import tqdm
 from events import Event, EventStore, FloppyDiskCaptureDirectoryConverted, FloppyDiskCaptureSummarized, FloppyInfoFromIMD, FloppyInfoFromXML, PyHXCFEERunFinished, PyHXCFEERunStarted, PyHXCFERunId
 from python_imd.imd import Disk
@@ -188,154 +189,21 @@ def process_converted_disks(pyhxcfe_run_id: PyHXCFERunId, disk_captures_dir: Pat
 
             floppy_summaries.append(floppy_summary_row)
 
-    # Generate HTML
-    html = """<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Floppy Disk Processing Summary</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            margin: 20px;
-            background-color: #f5f5f5;
-        }
-        h1 {
-            color: #333;
-        }
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            background-color: white;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-        th {
-            background-color: #4CAF50;
-            color: white;
-            padding: 12px;
-            text-align: left;
-            position: sticky;
-            top: 0;
-        }
-        td {
-            padding: 10px;
-            border-bottom: 1px solid #ddd;
-        }
-        tr:hover {
-            background-color: #f5f5f5;
-        }
-        .error {
-            color: red;
-            font-style: italic;
-        }
-        .summary {
-            background-color: white;
-            padding: 15px;
-            margin-bottom: 20px;
-            border-radius: 5px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-        code {
-            background-color: #f4f4f4;
-            padding: 2px 6px;
-            border-radius: 3px;
-            font-size: 0.9em;
-        }
-        .png-links {
-            display: flex;
-            gap: 8px;
-            flex-wrap: wrap;
-        }
-        .png-links a {
-            padding: 4px 8px;
-            background-color: #2196F3;
-            color: white;
-            text-decoration: none;
-            border-radius: 3px;
-            font-size: 0.85em;
-        }
-        .png-links a:hover {
-            background-color: #0b7dda;
-        }
-        .imd-error {
-            color: #d32f2f;
-            font-weight: bold;
-        }
-        .imd-no-error {
-            color: #388e3c;
-        }
-    </style>
-</head>
-<body>
-    <h1>Floppy Disk Processing Summary</h1>
-    <div class="summary">
-        <p><strong>Total processed floppies:</strong> """ + str(len(floppy_summaries)) + """</p>
-        <p><strong>Generated:</strong> """ + datetime.now().strftime("%Y-%m-%d %H:%M:%S") + """</p>
-        <p><strong>Source directory:</strong> <code>""" + str(disk_captures_dir) + """</code></p>
-    </div>
-    <table>
-        <thead>
-            <tr>
-                <th>Parent Directory</th>
-                <th>PNG Images</th>
-                <th>File Size</th>
-                <th>Tracks</th>
-                <th>Sides</th>
-                <th>Format</th>
-                <th>Sectors/Track</th>
-                <th>Sector Size</th>
-                <th>Bitrate</th>
-                <th>RPM</th>
-                <th>CRC32</th>
-                <th>IMD Tracks</th>
-                <th>IMD Modes</th>
-                <th>IMD Errors</th>
-            </tr>
-        </thead>
-        <tbody>
-"""
+    # Generate HTML using Jinja2
+    template_dir = Path(__file__) .parent / 'templates'
+    env = Environment(loader=FileSystemLoader(template_dir))
+    template = env.get_template('summary.html')
     
-    for floppy in floppy_summaries:
-        png_links_html = '<div class="png-links">'
-        for file_name, link_text in (('PNG_IMAGE.png', 'Image'), ('PNG_STREAM.png', 'Stream'), ('PNG_DISK_IMAGE.png', 'Disk')):
-            rel_path = floppy.floppy_subdir / file_name
-            png_links_html += f'<a href="{rel_path}" target="_blank">{link_text}</a>'
-        png_links_html += '</div>'
-        
-        if floppy.summary_event.info_from_imd.parsing_errors:
-            imd_errors_html = f'<span class="imd-error">{floppy.summary_event.info_from_imd.parsing_errors}</span>'
-        elif floppy.summary_event.info_from_imd.error_count:
-            imd_errors_html = f'<span class="imd-error">{floppy.summary_event.info_from_imd.error_count}</span>'
-        else:
-            imd_errors_html = f'<span class="imd-no-error">{floppy.summary_event.info_from_imd.error_count}</span>'
-        
-        html += f"""            <tr>
-            <td>{floppy.floppy_subdir.name}</td>
-            <td>{png_links_html}</td>
-            <td>{floppy.summary_event.info_from_xml.file_size}</td>
-            <td>{floppy.summary_event.info_from_xml.number_of_tracks}</td>
-            <td>{floppy.summary_event.info_from_xml.number_of_sides}</td>
-            <td>{floppy.summary_event.info_from_xml.format}</td>
-            <td>{floppy.summary_event.info_from_xml.sector_per_track}</td>
-            <td>{floppy.summary_event.info_from_xml.sector_size}</td>
-            <td>{floppy.summary_event.info_from_xml.bitrate}</td>
-            <td>{floppy.summary_event.info_from_xml.rpm}</td>
-            <td>{floppy.summary_event.info_from_xml.crc32}</td>
-            <td>{floppy.summary_event.info_from_imd.tracks}</td>
-            <td>{', '.join(floppy.summary_event.info_from_imd.modes) if floppy.summary_event.info_from_imd.modes else 'N/A'}</td>
-            <td>{imd_errors_html}</td>
-        </tr>
-"""
-    
-    html += """        </tbody>
-    </table>
-</body>
-</html>
-"""
+    html = template.render(
+        total_floppies=len(floppy_summaries),
+        generated_time=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        source_directory=str(disk_captures_dir),
+        floppy_summaries=floppy_summaries
+    )
     
     with open(output_file, 'w', encoding='utf-8') as f:
         f.write(html)
+
     
     print(f"\nHTML summary generated: {output_file}")
     print(f"Total floppies: {len(floppy_summaries)}")
