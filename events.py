@@ -16,15 +16,62 @@ class PyHXCFEERunStarted(Event):
     command: list[str]
     host: str
     start_time: str
+    git_revision: str
 
 
 @dataclass
-class FloppyDiskCaptureProcessed(Event):
+class FloppyDiskCaptureDirectoryConverted(Event):
     """
-    Event triggered when a floppy disk capture has been processed
+    Event triggered when a floppy disk capture has been converted
     using hxcfe.
     """
     pyhxcfe_run_id: PyHXCFERunId
-    capture_path: str
+    capture_directory: str
     success: bool
     formats: list[str]
+
+@dataclass
+class FloppyInfoFromXML():
+    file_size: int
+    number_of_tracks: int
+    number_of_sides: int
+    format: str
+    sector_per_track: int
+    sector_size: int
+    bitrate: int
+    rpm: int
+    crc32: int
+
+@dataclass
+class FloppyInfoFromIMD():
+    parsing_success: bool
+    tracks: int | None
+    modes: list[str] | None
+    error_count: int | None
+    parsing_errors: str | None
+
+
+@dataclass
+class FloppyDiskCaptureSummarized(Event):
+    """
+    Event triggered when a floppy disk capture has been summarized.
+    """
+    pyhxcfe_run_id: PyHXCFERunId
+    capture_directory: str
+
+    info_from_xml: FloppyInfoFromXML
+    info_from_imd: FloppyInfoFromIMD
+
+
+@dataclass
+class PyHXCFEERunFinished(Event):
+    """
+    Event triggered when pyhxcfe finishes processing.
+    """
+    pyhxcfe_run_id: PyHXCFERunId
+
+
+class EventStore:
+    def emit_event(self, event: Event) -> None:
+        """Emit an event (currently just prints to stdout)."""
+        print(f"Event emitted: {event}")

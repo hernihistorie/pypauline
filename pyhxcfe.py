@@ -1,6 +1,7 @@
 # Goal of the script: Run the HxCFloppyEmulator software on disk captures made with Pauline
 # and output information about the floppy, sectors, formatting, contents in JSON.
 
+from dataclasses import dataclass
 from os import mkdir
 import os
 import shutil
@@ -15,8 +16,9 @@ import uuid
 
 import click
 from tqdm import tqdm
-from events import Event, PyHXCFEERunStarted, PyHXCFERunId
+from events import Event, EventStore, FloppyDiskCaptureDirectoryConverted, FloppyDiskCaptureSummarized, FloppyInfoFromIMD, FloppyInfoFromXML, PyHXCFEERunFinished, PyHXCFEERunStarted, PyHXCFERunId
 from python_imd.imd import Disk
+from util import get_git_version
 
 HXCFE_BINARY_PATH = Path('/home/sanqui/ha/HxCFloppyEmulator/build/hxcfe')
 WORKERS=16
@@ -37,11 +39,7 @@ FORMATS = [
     ('PNG_DISK_IMAGE', 'png'),
 ]
 
-def emit_event(event: Event):
-    """Emit an event (currently just prints to stdout)."""
-    print(f"Event emitted: {event}")
-
-def process_directory(hxcfe_binary_path: Path, floppy_subdir: Path):
+def convert_disk_capture_directory(pyhxcfe_run_id: PyHXCFERunId, hxcfe_binary_path: Path, floppy_subdir: Path) -> list[Event]:
     parsed_dir = floppy_subdir.parent / (floppy_subdir.name + "_parsed_wip")
     if not os.path.exists(parsed_dir):
         mkdir(parsed_dir)
@@ -67,83 +65,102 @@ def process_directory(hxcfe_binary_path: Path, floppy_subdir: Path):
 
     os.rename(parsed_dir, floppy_subdir.parent / (floppy_subdir.name + "_parsed"))
 
-    return floppy_subdir.name
+    return [
+        FloppyDiskCaptureDirectoryConverted(
+            pyhxcfe_run_id=pyhxcfe_run_id,
+            capture_directory=floppy_subdir.name,
+            success=True,
+            formats=[fmt for fmt, _ in FORMATS]
+        )
+    ]
 
 
-def parse_generic_xml(xml_path: Path) -> dict:
+def parse_generic_xml(xml_path: Path) -> FloppyInfoFromXML:
     """Parse GENERIC_XML.xml file and extract key information."""
-    try:
-        tree = ET.parse(xml_path)
-        root = tree.getroot()
-        
-        layout = root.find('layout')
-        if layout is None:
-            return None
-        
-        info = {
-            'interface_mode': root.findtext('interface_mode', ''),
-            'file_size': root.findtext('file_size', ''),
-            'number_of_track': layout.findtext('number_of_track', ''),
-            'number_of_side': layout.findtext('number_of_side', ''),
-            'format': layout.findtext('format', ''),
-            'sector_per_track': layout.findtext('sector_per_track', ''),
-            'sector_size': layout.findtext('sector_size', ''),
-            'bitrate': layout.findtext('bitrate', ''),
-            'rpm': layout.findtext('rpm', ''),
-            'crc32': layout.findtext('crc32', ''),
-        }
-        return info
-    except Exception as e:
-        return {'error': str(e)}
+    tree = ET.parse(xml_path)
+    root = tree.getroot()
+    
+    layout = root.find('layout')
+    assert layout
+    
+    file_size = root.findtext('file_size')
+    number_of_track = layout.findtext('number_of_track')
+    number_of_side = layout.findtext('number_of_side')
+    format_text = layout.findtext('format')
+    sector_per_track = layout.findtext('sector_per_track')
+    sector_size = layout.findtext('sector_size')
+    bitrate = layout.findtext('bitrate')
+    rpm = layout.findtext('rpm')
+    crc32 = layout.findtext('crc32')
+    
+    assert file_size is not None
+    assert number_of_track is not None
+    assert number_of_side is not None
+    assert format_text is not None
+    assert sector_per_track is not None
+    assert sector_size is not None
+    assert bitrate is not None
+    assert rpm is not None
+    assert crc32 is not None
+    
+    return FloppyInfoFromXML(
+        file_size=int(file_size),
+        number_of_tracks=int(number_of_track),
+        number_of_sides=int(number_of_side),
+        format=format_text,
+        sector_per_track=int(sector_per_track),
+        sector_size=int(sector_size),
+        bitrate=int(bitrate),
+        rpm=int(rpm),
+        crc32=int(crc32, 16),
+    )
+    
 
 
-def parse_imd_file(imd_path: Path) -> dict:
+def parse_imd_file(imd_path: Path) -> FloppyInfoFromIMD:
     """Parse IMD file and extract key information."""
     try:
         disk = Disk.from_file(str(imd_path))
         
         # Collect statistics
-        modes = set()
-        cylinders = set()
-        heads = set()
+        mode_names: list[str] = []
         errors = 0
         
         for track in disk.tracks:
-            modes.add(track.mode)
-            cylinders.add(track.cylinder)
-            heads.add(track.head)
-            # Check for error records using the has_error attribute
+            if track.mode.name not in mode_names:
+                mode_names.append(track.mode.name)
+
             for record in track.sector_data_records:
                 if hasattr(record, 'record_type') and hasattr(record.record_type, 'has_error'):
                     if record.record_type.has_error:
                         errors += 1
         
-        # Format mode information
-        mode_names = [mode.name for mode in sorted(modes)]
-        
-        info = {
-            'imd_tracks': len(disk.tracks),
-            'imd_modes': ', '.join(mode_names),
-            'imd_cylinders': f"{min(cylinders)}-{max(cylinders)}" if cylinders else "N/A",
-            'imd_heads': ', '.join(map(str, sorted(heads))),
-            'imd_errors': errors,
-        }
-        return info
+        return FloppyInfoFromIMD(
+            parsing_success=True,
+            tracks=len(disk.tracks),
+            modes=mode_names,
+            error_count=errors,
+            parsing_errors=None
+        )
     except Exception as e:
-        return {
-            'imd_tracks': 'N/A',
-            'imd_modes': 'N/A',
-            'imd_cylinders': 'N/A',
-            'imd_heads': 'N/A',
-            'imd_errors': f'Error: {str(e)}',
-        }
+        return FloppyInfoFromIMD(
+            parsing_success=False,
+            tracks=None,
+            modes=None,
+            error_count=None,
+            parsing_errors=f'Error: {str(e)}',
+        )
 
+@dataclass
+class FloppySummaryRow():
+    summary_event: FloppyDiskCaptureSummarized
+    floppy_subdir: Path
 
-def generate_html_summary(disk_captures_dir: Path, output_file: Path):
-    """Generate HTML summary of all processed floppies."""
-    
-    floppies = []
-    
+def process_converted_disks(pyhxcfe_run_id: PyHXCFERunId, disk_captures_dir: Path, output_file: Path):
+    """Gather data from converted disks and generate HTML summary."""
+
+    floppy_summaries: list[FloppySummaryRow] = []
+
     # Collect all processed directories
     for floppy_dir in sorted(disk_captures_dir.iterdir()):
         if not floppy_dir.is_dir():
@@ -153,39 +170,24 @@ def generate_html_summary(disk_captures_dir: Path, output_file: Path):
             if not floppy_subdir.name.endswith("_parsed"):
                 continue
             
-            xml_path = floppy_subdir / "GENERIC_XML.xml"
-            if not xml_path.exists():
-                continue
+            xml_info: FloppyInfoFromXML = parse_generic_xml(floppy_subdir / "GENERIC_XML.xml")
             
-            info = parse_generic_xml(xml_path)
-            if info is None:
-                continue
+            imd_info: FloppyInfoFromIMD = parse_imd_file(floppy_subdir / "IMD_IMG.imd")
             
-            # Parse IMD file if available
-            imd_path = floppy_subdir / "IMD_IMG.imd"
-            imd_info = {}
-            if imd_path.exists():
-                imd_info = parse_imd_file(imd_path)
-            
-            # Extract metadata from directory name
-            parent_name = floppy_subdir.parent.name
-            
-            # Get relative paths to PNG files
-            png_image = floppy_subdir / "PNG_IMAGE.png"
-            png_stream = floppy_subdir / "PNG_STREAM_IMAGE.png"
-            png_disk = floppy_subdir / "PNG_DISK_IMAGE.png"
-            
-            floppies.append({
-                'parent_dir': parent_name,
-                'parsed_dir': floppy_subdir.name,
-                'xml_path': xml_path,
-                'png_image': png_image if png_image.exists() else None,
-                'png_stream': png_stream if png_stream.exists() else None,
-                'png_disk': png_disk if png_disk.exists() else None,
-                **info,
-                **imd_info
-            })
-    
+            summary_event = FloppyDiskCaptureSummarized(
+                pyhxcfe_run_id=pyhxcfe_run_id,
+                capture_directory=floppy_subdir.name,
+                info_from_xml=xml_info,
+                info_from_imd=imd_info
+            )
+
+            floppy_summary_row = FloppySummaryRow(
+                summary_event=summary_event,
+                floppy_subdir=floppy_subdir
+            )
+
+            floppy_summaries.append(floppy_summary_row)
+
     # Generate HTML
     html = """<!DOCTYPE html>
 <html lang="en">
@@ -268,7 +270,7 @@ def generate_html_summary(disk_captures_dir: Path, output_file: Path):
 <body>
     <h1>Floppy Disk Processing Summary</h1>
     <div class="summary">
-        <p><strong>Total processed floppies:</strong> """ + str(len(floppies)) + """</p>
+        <p><strong>Total processed floppies:</strong> """ + str(len(floppy_summaries)) + """</p>
         <p><strong>Generated:</strong> """ + datetime.now().strftime("%Y-%m-%d %H:%M:%S") + """</p>
         <p><strong>Source directory:</strong> <code>""" + str(disk_captures_dir) + """</code></p>
     </div>
@@ -288,62 +290,42 @@ def generate_html_summary(disk_captures_dir: Path, output_file: Path):
                 <th>CRC32</th>
                 <th>IMD Tracks</th>
                 <th>IMD Modes</th>
-                <th>IMD Cylinders</th>
-                <th>IMD Heads</th>
                 <th>IMD Errors</th>
             </tr>
         </thead>
         <tbody>
 """
     
-    for floppy in floppies:
-        if 'error' in floppy:
-            html += f"""            <tr>
-                <td>{floppy['parent_dir']}</td>
-                <td colspan="16" class="error">Error: {floppy['error']}</td>
-            </tr>
-"""
+    for floppy in floppy_summaries:
+        png_links_html = '<div class="png-links">'
+        for file_name, link_text in (('PNG_IMAGE.png', 'Image'), ('PNG_STREAM.png', 'Stream'), ('PNG_DISK_IMAGE.png', 'Disk')):
+            rel_path = floppy.floppy_subdir / file_name
+            png_links_html += f'<a href="{rel_path}" target="_blank">{link_text}</a>'
+        png_links_html += '</div>'
+        
+        if floppy.summary_event.info_from_imd.parsing_errors:
+            imd_errors_html = f'<span class="imd-error">{floppy.summary_event.info_from_imd.parsing_errors}</span>'
+        elif floppy.summary_event.info_from_imd.error_count:
+            imd_errors_html = f'<span class="imd-error">{floppy.summary_event.info_from_imd.error_count}</span>'
         else:
-            # Build PNG links
-            png_links_html = '<div class="png-links">'
-            if floppy.get('png_image'):
-                rel_path = floppy['png_image'].relative_to(disk_captures_dir)
-                png_links_html += f'<a href="{rel_path}" target="_blank">Image</a>'
-            if floppy.get('png_stream'):
-                rel_path = floppy['png_stream'].relative_to(disk_captures_dir)
-                png_links_html += f'<a href="{rel_path}" target="_blank">Stream</a>'
-            if floppy.get('png_disk'):
-                rel_path = floppy['png_disk'].relative_to(disk_captures_dir)
-                png_links_html += f'<a href="{rel_path}" target="_blank">Disk</a>'
-            png_links_html += '</div>'
-            
-            # Format IMD errors with styling
-            imd_errors_value = floppy.get('imd_errors', 'N/A')
-            if isinstance(imd_errors_value, str) and 'Error:' in imd_errors_value:
-                imd_errors_html = f'<span class="imd-error">{imd_errors_value}</span>'
-            elif imd_errors_value == 0:
-                imd_errors_html = f'<span class="imd-no-error">{imd_errors_value}</span>'
-            else:
-                imd_errors_html = f'<span class="imd-error">{imd_errors_value}</span>'
-            
-            html += f"""            <tr>
-                <td>{floppy['parent_dir']}</td>
-                <td>{png_links_html}</td>
-                <td>{floppy['file_size']}</td>
-                <td>{floppy['number_of_track']}</td>
-                <td>{floppy['number_of_side']}</td>
-                <td>{floppy['format']}</td>
-                <td>{floppy['sector_per_track']}</td>
-                <td>{floppy['sector_size']}</td>
-                <td>{floppy['bitrate']}</td>
-                <td>{floppy['rpm']}</td>
-                <td>{floppy['crc32']}</td>
-                <td>{floppy.get('imd_tracks', 'N/A')}</td>
-                <td>{floppy.get('imd_modes', 'N/A')}</td>
-                <td>{floppy.get('imd_cylinders', 'N/A')}</td>
-                <td>{floppy.get('imd_heads', 'N/A')}</td>
-                <td>{imd_errors_html}</td>
-            </tr>
+            imd_errors_html = f'<span class="imd-no-error">{floppy.summary_event.info_from_imd.error_count}</span>'
+        
+        html += f"""            <tr>
+            <td>{floppy.floppy_subdir.name}</td>
+            <td>{png_links_html}</td>
+            <td>{floppy.summary_event.info_from_xml.file_size}</td>
+            <td>{floppy.summary_event.info_from_xml.number_of_tracks}</td>
+            <td>{floppy.summary_event.info_from_xml.number_of_sides}</td>
+            <td>{floppy.summary_event.info_from_xml.format}</td>
+            <td>{floppy.summary_event.info_from_xml.sector_per_track}</td>
+            <td>{floppy.summary_event.info_from_xml.sector_size}</td>
+            <td>{floppy.summary_event.info_from_xml.bitrate}</td>
+            <td>{floppy.summary_event.info_from_xml.rpm}</td>
+            <td>{floppy.summary_event.info_from_xml.crc32}</td>
+            <td>{floppy.summary_event.info_from_imd.tracks}</td>
+            <td>{', '.join(floppy.summary_event.info_from_imd.modes) if floppy.summary_event.info_from_imd.modes else 'N/A'}</td>
+            <td>{imd_errors_html}</td>
+        </tr>
 """
     
     html += """        </tbody>
@@ -356,7 +338,7 @@ def generate_html_summary(disk_captures_dir: Path, output_file: Path):
         f.write(html)
     
     print(f"\nHTML summary generated: {output_file}")
-    print(f"Total floppies: {len(floppies)}")
+    print(f"Total floppies: {len(floppy_summaries)}")
 
 
 @click.command()
@@ -382,11 +364,6 @@ def generate_html_summary(disk_captures_dir: Path, output_file: Path):
     help='Redo processing of already finished directories'
 )
 @click.option(
-    '--generate-summary',
-    is_flag=True,
-    help='Generate HTML summary after processing'
-)
-@click.option(
     '--summary-only',
     is_flag=True,
     help='Only generate HTML summary without processing'
@@ -398,77 +375,80 @@ def generate_html_summary(disk_captures_dir: Path, output_file: Path):
     help='Output path for HTML summary (default: summary_TIMESTAMP.html in disk captures dir)'
 )
 def main(disk_captures_dir: Path, hxcfe_binary_path: Path, workers: int, redo: bool, 
-         generate_summary: bool, summary_only: bool, output: Path | None):
+         summary_only: bool, output: Path | None):
     """Process disk captures with HxCFloppyEmulator.
     
     DISK_CAPTURES_DIR: Directory containing floppy disk captures to process
     """
 
+    event_store = EventStore()
+
     run_id = PyHXCFERunId(str(uuid.uuid7()))
 
-    emit_event(PyHXCFEERunStarted(
+    event_store.emit_event(PyHXCFEERunStarted(
         pyhxcfe_run_id=run_id,
         command=sys.argv,
         host=os.uname().nodename,
-        start_time=datetime.now().isoformat()
+        start_time=datetime.now().isoformat(),
+        git_revision=get_git_version()
     ))
 
-    # If summary-only, just generate the summary and exit
-    if summary_only:
-        if output is None:
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            output = disk_captures_dir / f"summary_{timestamp}.html"
-        generate_html_summary(disk_captures_dir, output)
-        return
+    if not summary_only:
+        print(f"Using {workers} workers.")
 
-    print(f"Using {workers} workers.")
+        dirs: list[Path] = []
+        finished_dirs: list[Path] = []
 
-    dirs: list[Path] = []
-    finished_dirs: list[Path] = []
-
-    for floppy_dir in disk_captures_dir.iterdir():
-        if not floppy_dir.is_dir():
-            continue
-        for floppy_subdir in floppy_dir.iterdir():
-            if floppy_subdir.name.endswith("_parsed"):
+        for floppy_dir in disk_captures_dir.iterdir():
+            if not floppy_dir.is_dir():
                 continue
-
-            if floppy_subdir.name.endswith("_parsed_wip"):
-                shutil.rmtree(floppy_subdir)
-                continue
-
-            if os.path.isdir(floppy_subdir.parent / (floppy_subdir.name + "_parsed")):
-                if redo:
-                    shutil.rmtree(floppy_subdir.parent / (floppy_subdir.name + "_parsed"))
-                else:
-                    finished_dirs.append(floppy_subdir)
+            for floppy_subdir in floppy_dir.iterdir():
+                if floppy_subdir.name.endswith("_parsed"):
                     continue
 
-            dirs.append(floppy_subdir)
+                if floppy_subdir.name.endswith("_parsed_wip"):
+                    shutil.rmtree(floppy_subdir)
+                    continue
 
-    dirs.sort()
-    print(f"Found {len(dirs)} directories to process, {len(finished_dirs)} already finished.")
+                if os.path.isdir(floppy_subdir.parent / (floppy_subdir.name + "_parsed")):
+                    if redo:
+                        shutil.rmtree(floppy_subdir.parent / (floppy_subdir.name + "_parsed"))
+                    else:
+                        finished_dirs.append(floppy_subdir)
+                        continue
 
-    with tqdm(total=len(dirs)) as pbar:
-        with ThreadPoolExecutor(max_workers=workers) as ex:
-            futures = [
-                ex.submit(process_directory, hxcfe_binary_path, dir) for dir in dirs
-            ]
-            for future in as_completed(futures):
-                try:
-                    result = future.result()
-                    pbar.write(f"Completed {result}")
-                except Exception as ex:
-                    pbar.write(f"Failed to complete: {type(ex).__name__}: {ex}")
-                pbar.update(1)
+                dirs.append(floppy_subdir)
 
-    # Generate HTML summary if requested
-    if generate_summary:
-        if output is None:
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            output = disk_captures_dir / f"summary_{timestamp}.html"
-        generate_html_summary(disk_captures_dir, output)
+        dirs.sort()
+        print(f"Found {len(dirs)} directories to process, {len(finished_dirs)} already finished.")
 
+        results: list[Event] = []
+
+        with tqdm(total=len(dirs)) as pbar:
+            with ThreadPoolExecutor(max_workers=workers) as ex:
+                futures = [
+                    ex.submit(convert_disk_capture_directory, run_id, hxcfe_binary_path, dir) for dir in dirs
+                ]
+                for future in as_completed(futures):
+                    try:
+                        result: list[Event] = future.result()
+                        pbar.write(f"Completed {result}")
+                        results.extend(result)
+                    except Exception as ex:
+                        pbar.write(f"Failed to complete: {type(ex).__name__}: {ex}")
+                    pbar.update(1)
+        
+        for event in results:
+            event_store.emit_event(event)
+
+    if output is None:
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        output = disk_captures_dir / f"summary_{timestamp}.html"
+    process_converted_disks(run_id, disk_captures_dir, output)
+
+    event_store.emit_event(PyHXCFEERunFinished(
+        pyhxcfe_run_id=run_id
+    ))
 
 if __name__ == '__main__':
     main()
