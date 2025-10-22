@@ -13,12 +13,6 @@ import getpass
 import click
 import websockets
 
-import tkinter as tk
-from PIL import Image, ImageTk
-import io
-import threading
-from queue import Queue
-
 NUM_TRACKS = 82
 #DUMP_TIME = 440
 #DUMP_TIME = 100
@@ -26,40 +20,6 @@ DUMP_TIME = 840
 
 INVENTORY_CODE="hh"
 
-class TrackImageViewer:
-    def __init__(self):
-        self.image_queue = Queue()
-        self.thread = threading.Thread(target=self._run_viewer, daemon=True)
-        self.thread.start()
-
-    def _run_viewer(self):
-        root = tk.Tk()
-        root.title("Track Viewer")
-        root.minsize(800, 600)
-        self.label = tk.Label(root)
-        self.label.pack()
-        
-        def update_image():
-            try:
-                while not self.image_queue.empty():
-                    image_data = self.image_queue.get_nowait()
-                    image = Image.open(io.BytesIO(image_data))
-                    # Resize image to reasonable dimensions if needed
-                    # image.thumbnail((800, 600))
-                    try:
-                        photo = ImageTk.PhotoImage(image)
-                        self.label.configure(image=photo)
-                        self.label.image = photo  # Keep a reference!
-                    except OSError:
-                        pass
-            finally:
-                root.after(50, update_image)  # Schedule next update
-        
-        update_image()
-        root.mainloop()
-
-    def show_image(self, image_data):
-        self.image_queue.put(image_data)
 
 @dataclass
 class Pauline():
@@ -69,7 +29,6 @@ class Pauline():
     
     def __post_init__(self):
         self.pending_tasks = set()
-        # self.image_viewer = TrackImageViewer()
 
     async def connect(self):
         print("Connecting to websockets...")
@@ -194,9 +153,6 @@ class Pauline():
             async with asyncio.timeout(2.0):
                 await self.ws_image.send("get_image")
                 image_data = await self.ws_image.recv()
-                
-                # Show image in viewer
-                # self.image_viewer.show_image(image_data)
                 
                 # Ensure the images directory exists
                 image_dir = output_dir / f"{filename_base}_images"

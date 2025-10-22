@@ -7,7 +7,6 @@ requires-python = ">=3.14"
 dependencies = [
     "asyncssh>=2.19.0",
     "click>=8.0.0",
-    "pillow>=11.1.0",
     "tqdm>=4.67.1",
     "websockets>=14.2",
 ]
