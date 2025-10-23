@@ -4,6 +4,7 @@
 from dataclasses import dataclass
 from os import mkdir
 import os
+import re
 import shutil
 import subprocess
 import shlex
@@ -17,7 +18,7 @@ import uuid
 import click
 from jinja2 import Environment, FileSystemLoader
 from tqdm import tqdm
-from events import Event, EventStore, FloppyDiskCaptureDirectoryConverted, FloppyDiskCaptureSummarized, FloppyInfoFromIMD, FloppyInfoFromXML, PyHXCFEERunFinished, PyHXCFEERunStarted, PyHXCFERunId
+from events import Event, EventStore, FloppyDiskCaptureDirectoryConverted, FloppyDiskCaptureSummarized, FloppyInfoFromIMD, FloppyInfoFromName, FloppyInfoFromXML, PyHXCFEERunFinished, PyHXCFEERunStarted, PyHXCFERunId
 from python_imd.imd import Disk
 from util import get_git_version
 
@@ -75,6 +76,38 @@ def convert_disk_capture_directory(pyhxcfe_run_id: PyHXCFERunId, hxcfe_binary_pa
         )
     ]
 
+def parse_name(floppy_subdir_name: str) -> FloppyInfoFromName:
+    """
+    Parse floppy subdirectory name such as "2025-10-03_16-52-51_sanqui_hh9125_35fd4-0001_parsed"
+    """
+    # Pattern: YYYY-MM-DD_HH-MM-SS_operator_item_identifier_drive-dump_index
+    pattern = r'^(\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2})_([^_]+)_([^_]+)_([^_]+)-(\d+)_parsed$'
+
+    match = re.match(pattern, floppy_subdir_name)
+    if not match:
+        raise ValueError(f"Cannot parse floppy subdirectory name: {floppy_subdir_name}")
+    
+    datetime_str = match.group(1)
+    operator = match.group(2)
+    item_identifier = match.group(3)
+    drive = match.group(4)
+    dump_index_str = match.group(5)
+    
+    # Parse hh_asset_id from item_identifier if it starts with "hh" or "rh"
+    hh_asset_id = None
+    if item_identifier.startswith(('hh', 'rh')):
+        # Extract numeric part after the prefix
+        hh_asset_id = int(re.sub(r'^(hh|rh)', '', item_identifier))
+    
+    return FloppyInfoFromName(
+        datetime=datetime_str,
+        operator=operator,
+        item_identifier=item_identifier,
+        hh_asset_id=hh_asset_id,
+        drive=drive,
+        dump_index=int(dump_index_str)
+    )
+
 
 def parse_generic_xml(xml_path: Path) -> FloppyInfoFromXML:
     """Parse GENERIC_XML.xml file and extract key information."""
@@ -82,7 +115,7 @@ def parse_generic_xml(xml_path: Path) -> FloppyInfoFromXML:
     root = tree.getroot()
     
     layout = root.find('layout')
-    assert layout
+    assert layout is not None
     
     file_size = root.findtext('file_size')
     number_of_track = layout.findtext('number_of_track')
@@ -170,6 +203,8 @@ def process_converted_disks(pyhxcfe_run_id: PyHXCFERunId, disk_captures_dir: Pat
         for floppy_subdir in sorted(floppy_dir.iterdir()):
             if not floppy_subdir.name.endswith("_parsed"):
                 continue
+
+            name_info: FloppyInfoFromName = parse_name(floppy_subdir.name)
             
             xml_info: FloppyInfoFromXML = parse_generic_xml(floppy_subdir / "GENERIC_XML.xml")
             
@@ -178,8 +213,9 @@ def process_converted_disks(pyhxcfe_run_id: PyHXCFERunId, disk_captures_dir: Pat
             summary_event = FloppyDiskCaptureSummarized(
                 pyhxcfe_run_id=pyhxcfe_run_id,
                 capture_directory=floppy_subdir.name,
-                info_from_xml=xml_info,
-                info_from_imd=imd_info
+                name_info=name_info,
+                xml_info=xml_info,
+                imd_info=imd_info
             )
 
             floppy_summary_row = FloppySummaryRow(

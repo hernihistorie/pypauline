@@ -31,6 +31,19 @@ class FloppyDiskCaptureDirectoryConverted(Event):
     formats: list[str]
 
 @dataclass
+class FloppyInfoFromName():
+    datetime: str
+    operator: str
+    item_identifier: str
+    drive: str
+    dump_index: int
+
+    hh_asset_id: int | None
+    """
+    Parsed from item identifier if it is prefixed with "rh" or "hh".
+    """
+
+@dataclass
 class FloppyInfoFromXML():
     file_size: int
     number_of_tracks: int
@@ -59,8 +72,9 @@ class FloppyDiskCaptureSummarized(Event):
     pyhxcfe_run_id: PyHXCFERunId
     capture_directory: str
 
-    info_from_xml: FloppyInfoFromXML
-    info_from_imd: FloppyInfoFromIMD
+    name_info: FloppyInfoFromName
+    xml_info: FloppyInfoFromXML
+    imd_info: FloppyInfoFromIMD
 
 
 @dataclass

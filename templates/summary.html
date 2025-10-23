@@ -86,7 +86,10 @@
     <table>
         <thead>
             <tr>
-                <th>Parent Directory</th>
+                <th>Datetime</th>
+                <th>Operator</th>
+                <th>Item</th>
+                <th>Drive</th>
                 <th>PNG Images</th>
                 <th>File Size</th>
                 <th>Tracks</th>
@@ -105,7 +108,10 @@
         <tbody>
             {% for floppy in floppy_summaries %}
             <tr>
-                <td>{{ floppy.floppy_subdir.name }}</td>
+                <td>{{ floppy.summary_event.name_info.datetime }}</td>
+                <td>{{ floppy.summary_event.name_info.operator }}</td>
+                <td>{{ floppy.summary_event.name_info.item_identifier }}</td>
+                <td>{{ floppy.summary_event.name_info.drive }}</td>
                 <td>
                     <div class="png-links">
                         {% for file_name, link_text in [('PNG_IMAGE.png', 'Image'), ('PNG_STREAM.png', 'Stream'), ('PNG_DISK_IMAGE.png', 'Disk')] %}
@@ -113,24 +119,24 @@
                         {% endfor %}
                     </div>
                 </td>
-                <td>{{ floppy.summary_event.info_from_xml.file_size }}</td>
-                <td>{{ floppy.summary_event.info_from_xml.number_of_tracks }}</td>
-                <td>{{ floppy.summary_event.info_from_xml.number_of_sides }}</td>
-                <td>{{ floppy.summary_event.info_from_xml.format }}</td>
-                <td>{{ floppy.summary_event.info_from_xml.sector_per_track }}</td>
-                <td>{{ floppy.summary_event.info_from_xml.sector_size }}</td>
-                <td>{{ floppy.summary_event.info_from_xml.bitrate }}</td>
-                <td>{{ floppy.summary_event.info_from_xml.rpm }}</td>
-                <td>{{ floppy.summary_event.info_from_xml.crc32 }}</td>
-                <td>{{ floppy.summary_event.info_from_imd.tracks }}</td>
-                <td>{{ ', '.join(floppy.summary_event.info_from_imd.modes) if floppy.summary_event.info_from_imd.modes else 'N/A' }}</td>
+                <td>{{ floppy.summary_event.xml_info.file_size }}</td>
+                <td>{{ floppy.summary_event.xml_info.number_of_tracks }}</td>
+                <td>{{ floppy.summary_event.xml_info.number_of_sides }}</td>
+                <td>{{ floppy.summary_event.xml_info.format }}</td>
+                <td>{{ floppy.summary_event.xml_info.sector_per_track }}</td>
+                <td>{{ floppy.summary_event.xml_info.sector_size }}</td>
+                <td>{{ floppy.summary_event.xml_info.bitrate }}</td>
+                <td>{{ floppy.summary_event.xml_info.rpm }}</td>
+                <td>{{ floppy.summary_event.xml_info.crc32 }}</td>
+                <td>{{ floppy.summary_event.imd_info.tracks }}</td>
+                <td>{{ ', '.join(floppy.summary_event.imd_info.modes) if floppy.summary_event.imd_info.modes else 'N/A' }}</td>
                 <td>
-                    {% if floppy.summary_event.info_from_imd.parsing_errors %}
-                        <span class="imd-error">{{ floppy.summary_event.info_from_imd.parsing_errors }}</span>
-                    {% elif floppy.summary_event.info_from_imd.error_count %}
-                        <span class="imd-error">{{ floppy.summary_event.info_from_imd.error_count }}</span>
+                    {% if floppy.summary_event.imd_info.parsing_errors %}
+                        <span class="imd-error">{{ floppy.summary_event.imd_info.parsing_errors }}</span>
+                    {% elif floppy.summary_event.imd_info.error_count %}
+                        <span class="imd-error">{{ floppy.summary_event.imd_info.error_count }}</span>
                     {% else %}
-                        <span class="imd-no-error">{{ floppy.summary_event.info_from_imd.error_count }}</span>
+                        <span class="imd-no-error">{{ floppy.summary_event.imd_info.error_count }}</span>
                     {% endif %}
                 </td>
             </tr>
