@@ -292,6 +292,7 @@ def main(disk_captures_dir: Path, hxcfe_binary_path: Path, workers: int, redo: b
     event_store.emit_event(PyHXCFEERunStarted(
         pyhxcfe_run_id=run_id,
         command=sys.argv,
+        user=os.getenv('USER'),
         host=os.uname().nodename,
         start_time=datetime.now().isoformat(),
         git_revision=get_git_version()

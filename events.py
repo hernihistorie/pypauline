@@ -14,7 +14,8 @@ class PyHXCFEERunStarted(Event):
     """
     pyhxcfe_run_id: PyHXCFERunId
     command: list[str]
-    host: str
+    user: str | None
+    host: str | None
     start_time: str
     git_revision: str
 
