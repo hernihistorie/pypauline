@@ -298,6 +298,11 @@ def main(disk_captures_dir: Path, hxcfe_binary_path: Path, workers: int, redo: b
         git_revision=get_git_version()
     ))
 
+    if ' ' in str(disk_captures_dir) or '?' in str(disk_captures_dir).encode('ascii', 'replace').decode('ascii'):
+        print(f"Error: disk captures directory path contains spaces or non-ASCII characters: {disk_captures_dir}")
+        print("This is not supported by HxCFloppyEmulator.  Exiting.")
+        sys.exit(1)
+
     if not summary_only:
         print(f"Using {workers} workers.")
 
