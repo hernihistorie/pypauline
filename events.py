@@ -1,9 +1,16 @@
-from dataclasses import dataclass
+import datetime
+from dataclasses import dataclass, field,
 from typing import NewType
 
-@dataclass
+@dataclass(kw_only=True)
 class Event:
     """Base class for events."""
+
+    timestamp: datetime.datetime = field(default_factory=datetime.datetime.now)
+
+@dataclass
+class TestEvent(Event):
+    test_data: str
 
 PyHXCFERunId = NewType('PyHXCFERunId', str)
 
@@ -84,9 +91,3 @@ class PyHXCFEERunFinished(Event):
     Event triggered when pyhxcfe finishes processing.
     """
     pyhxcfe_run_id: PyHXCFERunId
-
-
-class EventStore:
-    def emit_event(self, event: Event) -> None:
-        """Emit an event (currently just prints to stdout)."""
-        print(f"Event emitted: {event}")
