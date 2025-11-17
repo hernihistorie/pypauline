@@ -1,5 +1,5 @@
 import datetime
-from dataclasses import dataclass, field,
+from dataclasses import dataclass, field
 from typing import NewType
 
 @dataclass(kw_only=True)
