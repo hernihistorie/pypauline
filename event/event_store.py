@@ -4,7 +4,7 @@ import time
 
 import requests
 
-from events import Event
+from event.events import Event
 
 PUSH_KEY_LENGTH = 24
 EVENT_STORE_API_ADDRESS = "https://127.0.0.1:8000"
@@ -26,7 +26,7 @@ class EventStore:
 
         print("Pushing events to rhinventory...")
 
-        push_key = "pushkey_".join([random.choice(ascii_letters + digits) for _ in range(PUSH_KEY_LENGTH)])
+        push_key = "pushkey_" + ''.join([random.choice(ascii_letters + digits) for _ in range(PUSH_KEY_LENGTH)])
 
         print()
         print("Please authorize this push by visiting the following URL in your browser:")

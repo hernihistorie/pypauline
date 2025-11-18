@@ -3,11 +3,11 @@
 Simple test script to demonstrate OAuth2 device flow authentication for event pushing.
 """
 
-from events import TestEvent
+from event.events import TestEvent
 from event_store import EventStore
 
 def main():
-    store = EventStore()
+    store = EventStore(namespace='test', app='test_app')
     
     test_event = TestEvent(test_data="Hello world!")
     
