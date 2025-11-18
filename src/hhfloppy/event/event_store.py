@@ -5,7 +5,7 @@ import time
 import requests
 import msgspec
 
-from event.events import Event
+from .events import Event
 
 PUSH_KEY_LENGTH = 24
 EVENT_STORE_API_ADDRESS = "https://127.0.0.1:8000"

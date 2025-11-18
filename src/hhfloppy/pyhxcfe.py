@@ -18,7 +18,8 @@ import uuid
 import click
 from jinja2 import Environment, FileSystemLoader
 from tqdm import tqdm
-from event.events import Event, EventStore, FloppyDiskCaptureDirectoryConverted, FloppyDiskCaptureSummarized, FloppyInfoFromIMD, FloppyInfoFromName, FloppyInfoFromXML, PyHXCFEERunFinished, PyHXCFEERunStarted, PyHXCFERunId
+from event.events import Event, EventStore, FloppyDiskCaptureDirectoryConverted, FloppyDiskCaptureSummarized, PyHXCFEERunFinished, PyHXCFEERunStarted, PyHXCFERunId
+from hhfloppy.event.datatypes import FloppyInfoFromIMD, FloppyInfoFromName, FloppyInfoFromXML
 from python_imd.imd import Disk
 from hhfloppy.util import get_git_version
 
