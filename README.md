@@ -1,6 +1,8 @@
-# pypauline
+# hhfloppy
 
-This repository contains tools to work with the open source floppy disk dumper [Pauline](https://github.com/jfdelnero/Pauline).
+This repository contains tools for working with floppies developed at the [Czechoslovak Game Archive](https://herniarchiv.cz/).
+
+Dumping at our archive is performed with the open source floppy disk dumper [Pauline](https://github.com/jfdelnero/Pauline).
 
 ## Dependencies
 
