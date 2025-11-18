@@ -3,6 +3,7 @@ from string import ascii_letters, digits
 import time
 
 import requests
+import msgspec
 
 from event.events import Event
 
@@ -23,6 +24,12 @@ class EventStore:
     
     def push(self) -> None:
         """Push events to the API endpoint."""
+
+        print(f"Serializing {len(self.events)} events...")
+
+        serialized_events = msgspec.json.encode(self.events)
+
+        print("Serialized data:", serialized_events)
 
         print("Pushing events to rhinventory...")
 

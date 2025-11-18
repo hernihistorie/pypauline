@@ -4,7 +4,7 @@ Simple test script to demonstrate OAuth2 device flow authentication for event pu
 """
 
 from event.events import TestEvent
-from event_store import EventStore
+from event.event_store import EventStore
 
 def main():
     store = EventStore(namespace='test', app='test_app')

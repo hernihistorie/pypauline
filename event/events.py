@@ -1,21 +1,22 @@
-import datetime
-from dataclasses import dataclass, field
-from typing import NewType
+from __future__ import annotations # Needed to fix https://github.com/jcrist/msgspec/issues/924
 
-@dataclass(kw_only=True)
-class Event:
+import datetime
+from typing import NewType
+import msgspec
+from msgspec import field
+
+class Event(msgspec.Struct, kw_only=True, frozen=True, tag_field="event_type", tag=True):
     """Base class for events."""
 
-    timestamp: datetime.datetime = field(default_factory=datetime.datetime.now)
+    event_version: int = 1
+    event_timestamp: datetime.datetime = field(default_factory=datetime.datetime.now)
 
-@dataclass
-class TestEvent(Event):
+class TestEvent(Event, kw_only=True, frozen=True):
     test_data: str
 
 PyHXCFERunId = NewType('PyHXCFERunId', str)
 
-@dataclass
-class PyHXCFEERunStarted(Event):
+class PyHXCFEERunStarted(Event, frozen=True):
     """
     Event triggered when pyhxcfe starts processing.
     """
@@ -27,8 +28,7 @@ class PyHXCFEERunStarted(Event):
     git_revision: str
 
 
-@dataclass
-class FloppyDiskCaptureDirectoryConverted(Event):
+class FloppyDiskCaptureDirectoryConverted(Event, frozen=True):
     """
     Event triggered when a floppy disk capture has been converted
     using hxcfe.
@@ -38,8 +38,7 @@ class FloppyDiskCaptureDirectoryConverted(Event):
     success: bool
     formats: list[str]
 
-@dataclass
-class FloppyInfoFromName():
+class FloppyInfoFromName(msgspec.Struct, kw_only=True, frozen=True):
     datetime: str
     operator: str
     item_identifier: str
@@ -51,8 +50,7 @@ class FloppyInfoFromName():
     Parsed from item identifier if it is prefixed with "rh" or "hh".
     """
 
-@dataclass
-class FloppyInfoFromXML():
+class FloppyInfoFromXML(msgspec.Struct, kw_only=True, frozen=True):
     file_size: int
     number_of_tracks: int
     number_of_sides: int
@@ -63,8 +61,7 @@ class FloppyInfoFromXML():
     rpm: int
     crc32: int
 
-@dataclass
-class FloppyInfoFromIMD():
+class FloppyInfoFromIMD(msgspec.Struct, kw_only=True, frozen=True):
     parsing_success: bool
     tracks: int | None
     modes: list[str] | None
@@ -72,8 +69,7 @@ class FloppyInfoFromIMD():
     parsing_errors: str | None
 
 
-@dataclass
-class FloppyDiskCaptureSummarized(Event):
+class FloppyDiskCaptureSummarized(Event, frozen=True):
     """
     Event triggered when a floppy disk capture has been summarized.
     """
@@ -85,8 +81,7 @@ class FloppyDiskCaptureSummarized(Event):
     imd_info: FloppyInfoFromIMD
 
 
-@dataclass
-class PyHXCFEERunFinished(Event):
+class PyHXCFEERunFinished(Event, frozen=True):
     """
     Event triggered when pyhxcfe finishes processing.
     """

@@ -211,6 +211,12 @@ wheels = [
 ]
 
 [[package]]
+name = "msgspec"
+version = "0.19.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/cf/9b/95d8ce458462b8b71b8a70fa94563b2498b89933689f3a7b8911edfae3d7/msgspec-0.19.0.tar.gz", hash = "sha256:604037e7cd475345848116e89c553aa9a233259733ab51986ac924ab1b976f8e", size = 216934, upload-time = "2024-12-27T17:40:28.597Z" }
+
+[[package]]
 name = "oauthlib"
 version = "3.3.1"
 source = { registry = "https://pypi.org/simple" }
@@ -236,6 +242,7 @@ dependencies = [
     { name = "asyncssh" },
     { name = "click" },
     { name = "jinja2" },
+    { name = "msgspec" },
     { name = "requests-oauthlib" },
     { name = "tqdm" },
     { name = "websockets" },
@@ -246,6 +253,7 @@ requires-dist = [
     { name = "asyncssh", specifier = ">=2.19.0" },
     { name = "click", specifier = ">=8.0.0" },
     { name = "jinja2", specifier = ">=3.1.0" },
+    { name = "msgspec", specifier = ">=0.19.0" },
     { name = "requests-oauthlib", specifier = ">=2.0.0" },
     { name = "tqdm", specifier = ">=4.67.1" },
     { name = "websockets", specifier = ">=14.2" },
