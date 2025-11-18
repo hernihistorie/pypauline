@@ -2,13 +2,14 @@ import random
 from string import ascii_letters, digits
 import time
 
+import json
 import requests
 import msgspec
 
 from .events import Event
 
 PUSH_KEY_LENGTH = 24
-EVENT_STORE_API_ADDRESS = "https://127.0.0.1:8000"
+EVENT_STORE_API_ADDRESS = "http://127.0.0.1:5000/event_store"
 
 class EventStore:
     def __init__(self, namespace: str, app: str) -> None:
@@ -27,7 +28,14 @@ class EventStore:
 
         print(f"Serializing {len(self.events)} events...")
 
-        serialized_events = msgspec.json.encode(self.events)
+        # INFO: we could be more efficient here by:
+        # - not encoding/decoding json
+        # - using msgspec.msgpack
+        # We do it so we can add the key and namespace and use all the
+        # json machinery that's already in place.
+        # Once we have a command protocol (like in Trovery), these
+        # improvements should be incorporated.
+        serialized_events = json.loads(msgspec.json.encode(self.events))
 
         print("Serialized data:", serialized_events)
 
@@ -37,7 +45,7 @@ class EventStore:
 
         print()
         print("Please authorize this push by visiting the following URL in your browser:")
-        print(f"{EVENT_STORE_API_ADDRESS}/authorize_push/?push_key={push_key}&namespace={self.namespace}&app={self.app}")
+        print(f"{EVENT_STORE_API_ADDRESS}/authorize?key={push_key}&namespace={self.namespace}&application_name={self.app}")
         print()
 
         time.sleep(2)
@@ -48,7 +56,7 @@ class EventStore:
             print(f"\rChecking authorization...  (attempt {attempts})", end="")
             response = requests.get(
                 f"{EVENT_STORE_API_ADDRESS}/check_key/",
-                params={"push_key": push_key, "namespace": self.namespace, "app": self.app},
+                params={"key": push_key, "namespace": self.namespace, "app": self.app},
                 timeout=5,
             )
             if response.status_code == 200:
@@ -60,5 +68,20 @@ class EventStore:
         
         print("\nAuthorization confirmed.")
 
-        raise NotImplementedError("TODO actually push the events")
-        
+        push_data = {
+            "namespace": self.namespace,
+            "key": push_key,
+            "serialized_events": serialized_events,
+        }
+
+        response = requests.post(
+            f"{EVENT_STORE_API_ADDRESS}/ingest/",
+            json=push_data,
+            timeout=10,
+        )
+
+        if response.status_code == 200:
+            print("Events successfully pushed.")
+        else:
+            print(f"Failed to push events. Status code: {response.status_code}")
+            print("Response:", response.text)
