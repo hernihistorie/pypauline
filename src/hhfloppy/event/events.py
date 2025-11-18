@@ -1,7 +1,7 @@
 from __future__ import annotations # Needed to fix https://github.com/jcrist/msgspec/issues/924
 
 import datetime
-from typing import NewType
+from typing import Any, NewType, Union
 import msgspec
 from msgspec import field
 
@@ -86,3 +86,17 @@ class PyHXCFEERunFinished(Event, frozen=True):
     Event triggered when pyhxcfe finishes processing.
     """
     pyhxcfe_run_id: PyHXCFERunId
+
+HHFLOPPY_EVENT_CLASS_UNION = Union[
+    TestEvent,
+    PyHXCFEERunStarted,
+    FloppyDiskCaptureDirectoryConverted,
+    FloppyDiskCaptureSummarized,
+    PyHXCFEERunFinished,
+]
+
+HHFLOPPY_EVENT_DATA_CLASS_UNION = Union[
+    FloppyInfoFromName,
+    FloppyInfoFromXML,
+    FloppyInfoFromIMD,
+]
