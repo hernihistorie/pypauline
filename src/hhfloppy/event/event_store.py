@@ -80,14 +80,23 @@ class EventStore:
             "serialized_events": serialized_events,
         }
 
-        response = requests.post(
-            f"{EVENT_STORE_API_ADDRESS}/ingest/",
-            json=push_data,
-            timeout=10,
-        )
+        finished = False
 
-        if response.status_code == 200:
-            print("Events successfully pushed.")
-        else:
-            print(f"Failed to push events. Status code: {response.status_code}")
-            print("Response:", response.text)
+        while not finished:
+            response = requests.post(
+                f"{EVENT_STORE_API_ADDRESS}/ingest/",
+                json=push_data,
+                timeout=10,
+            )
+
+            if response.status_code == 200:
+                print("Events successfully pushed.")
+                finished = True
+            else:
+                print(f"Failed to push events. Status code: {response.status_code}")
+                print("Response:", response.text)
+                answer = input("Failed to push events.  Would you like to retry? (y/n): ").strip().lower()
+                if answer != "y":
+                    finished = True
+        
+        print("Push complete.")
