@@ -22,7 +22,7 @@ from python_imd.imd import Disk
 from event.events import Event, FloppyDiskCaptureDirectoryConverted, FloppyDiskCaptureSummarized, PyHXCFEERunFinished, PyHXCFEERunStarted, PyHXCFERunId
 from event.event_store import EventStore
 from event.datatypes import FloppyInfoFromIMD, FloppyInfoFromName, FloppyInfoFromXML
-from util import get_git_version
+from util import floppy_disk_capture_filename_to_id, get_git_version
 
 HXCFE_BINARY_PATH = Path('/home/sanqui/ha/HxCFloppyEmulator/build/hxcfe')
 WORKERS=16
@@ -44,6 +44,7 @@ FORMATS = [
 ]
 
 def convert_disk_capture_directory(pyhxcfe_run_id: PyHXCFERunId, hxcfe_binary_path: Path, floppy_subdir: Path) -> list[Event]:
+    floppy_disk_capture_id = floppy_disk_capture_filename_to_id(floppy_subdir.name)
     parsed_dir = floppy_subdir.parent / (floppy_subdir.name + "_parsed_wip")
     if not os.path.exists(parsed_dir):
         mkdir(parsed_dir)
@@ -72,6 +73,8 @@ def convert_disk_capture_directory(pyhxcfe_run_id: PyHXCFERunId, hxcfe_binary_pa
     return [
         FloppyDiskCaptureDirectoryConverted(
             pyhxcfe_run_id=pyhxcfe_run_id,
+            floppy_disk_capture_id=floppy_disk_capture_id,
+            floppy_disk_capture_id_source='hashed_directory_name',
             capture_directory=floppy_subdir.name,
             success=True,
             formats=[fmt for fmt, _ in FORMATS]
@@ -205,6 +208,7 @@ def process_converted_disks(pyhxcfe_run_id: PyHXCFERunId, disk_captures_dir: Pat
         for floppy_subdir in sorted(floppy_dir.iterdir()):
             if not floppy_subdir.name.endswith("_parsed"):
                 continue
+            floppy_disk_capture_id = floppy_disk_capture_filename_to_id(floppy_subdir.name)
 
             name_info: FloppyInfoFromName = parse_name(floppy_subdir.name)
             
@@ -214,6 +218,8 @@ def process_converted_disks(pyhxcfe_run_id: PyHXCFERunId, disk_captures_dir: Pat
             
             summary_event = FloppyDiskCaptureSummarized(
                 pyhxcfe_run_id=pyhxcfe_run_id,
+                floppy_disk_capture_id=floppy_disk_capture_id,
+                floppy_disk_capture_id_source='hashed_directory_name',
                 capture_directory=floppy_subdir.name,
                 name_info=name_info,
                 xml_info=xml_info,

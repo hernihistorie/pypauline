@@ -1,6 +1,8 @@
+import uuid
 import subprocess
 from pathlib import Path
 
+FLOPPY_DISK_CAPTURE_FILENAME_UUID_NAMESPACE = uuid.UUID('019a9df8-6505-7032-923f-12a806f8bdbf')
 
 def get_git_version() -> str:
     """Get the current git revision, with -dirty suffix if there are uncommitted changes."""
@@ -29,3 +31,8 @@ def get_git_version() -> str:
     except (subprocess.CalledProcessError, FileNotFoundError):
         # If git is not available or not a git repo, return unknown
         return 'unknown'
+
+def floppy_disk_capture_filename_to_id(filename: str) -> uuid.UUID:
+    """Convert a floppy disk capture filename to a UUID based on its name."""
+    # Use UUID5 with the DNS namespace and the filename as the name
+    return uuid.uuid5(namespace=FLOPPY_DISK_CAPTURE_FILENAME_UUID_NAMESPACE, name=filename)

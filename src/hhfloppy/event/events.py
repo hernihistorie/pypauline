@@ -1,7 +1,7 @@
 from __future__ import annotations # Needed to fix https://github.com/jcrist/msgspec/issues/924
 
 import datetime
-from typing import NewType, Union
+from typing import Literal, NewType, Union
 import uuid
 
 import msgspec
@@ -12,7 +12,7 @@ from .datatypes import FloppyInfoFromIMD, FloppyInfoFromName, FloppyInfoFromXML,
 class Event(HHFloppyTaggedStruct, kw_only=True, frozen=True):
     """Base class for events."""
 
-    event_version: int = 2
+    event_version: int = 3
     event_timestamp: datetime.datetime = field(default_factory=datetime.datetime.now)
     event_id: uuid.UUID = field(default_factory=uuid.uuid7)
 
@@ -20,6 +20,9 @@ class TestEvent(Event, kw_only=True, frozen=True):
     test_data: str
 
 PyHXCFERunId = NewType('PyHXCFERunId', str)
+
+# Add e.g. info.json here once implemented
+FloppyDiskCaptureIDSource = Literal['hashed_directory_name']
 
 class PyHXCFEERunStarted(Event, frozen=True):
     """
@@ -32,13 +35,14 @@ class PyHXCFEERunStarted(Event, frozen=True):
     start_time: str
     git_revision: str
 
-
 class FloppyDiskCaptureDirectoryConverted(Event, frozen=True):
     """
     Event triggered when a floppy disk capture has been converted
     using hxcfe.
     """
     pyhxcfe_run_id: PyHXCFERunId
+    floppy_disk_capture_id: uuid.UUID
+    floppy_disk_capture_id_source: FloppyDiskCaptureIDSource
     capture_directory: str
     success: bool
     formats: list[str]
@@ -48,6 +52,8 @@ class FloppyDiskCaptureSummarized(Event, frozen=True):
     Event triggered when a floppy disk capture has been summarized.
     """
     pyhxcfe_run_id: PyHXCFERunId
+    floppy_disk_capture_id: uuid.UUID
+    floppy_disk_capture_id_source: FloppyDiskCaptureIDSource
     capture_directory: str
 
     name_info: FloppyInfoFromName
