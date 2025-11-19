@@ -2,6 +2,8 @@ from __future__ import annotations # Needed to fix https://github.com/jcrist/msg
 
 import datetime
 from typing import NewType, Union
+import uuid
+
 import msgspec
 from msgspec import field
 
@@ -10,8 +12,9 @@ from .datatypes import FloppyInfoFromIMD, FloppyInfoFromName, FloppyInfoFromXML,
 class Event(HHFloppyTaggedStruct, kw_only=True, frozen=True):
     """Base class for events."""
 
-    event_version: int = 1
+    event_version: int = 2
     event_timestamp: datetime.datetime = field(default_factory=datetime.datetime.now)
+    event_id: uuid.UUID = field(default_factory=uuid.uuid7)
 
 class TestEvent(Event, kw_only=True, frozen=True):
     test_data: str
