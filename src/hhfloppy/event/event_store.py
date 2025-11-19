@@ -3,6 +3,7 @@ from string import ascii_letters, digits
 import time
 
 import json
+from typing import Sequence
 import requests
 import msgspec
 
@@ -22,6 +23,11 @@ class EventStore:
         """Emit an event."""
         print(f"Event emitted: {event}")
         self.events.append(event)
+    
+    def emit_events(self, events: Sequence[Event]) -> None:
+        """Emit multiple events."""
+        for event in events:
+            self.emit_event(event)
     
     def push(self) -> None:
         """Push events to the API endpoint."""

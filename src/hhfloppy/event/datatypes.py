@@ -1,3 +1,6 @@
+from __future__ import annotations # Needed to fix https://github.com/jcrist/msgspec/issues/924
+
+from datetime import datetime
 from typing import Union
 
 import msgspec

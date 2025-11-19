@@ -18,10 +18,11 @@ import uuid
 import click
 from jinja2 import Environment, FileSystemLoader
 from tqdm import tqdm
-from event.events import Event, EventStore, FloppyDiskCaptureDirectoryConverted, FloppyDiskCaptureSummarized, PyHXCFEERunFinished, PyHXCFEERunStarted, PyHXCFERunId
-from hhfloppy.event.datatypes import FloppyInfoFromIMD, FloppyInfoFromName, FloppyInfoFromXML
 from python_imd.imd import Disk
-from hhfloppy.util import get_git_version
+from event.events import Event, FloppyDiskCaptureDirectoryConverted, FloppyDiskCaptureSummarized, PyHXCFEERunFinished, PyHXCFEERunStarted, PyHXCFERunId
+from event.event_store import EventStore
+from event.datatypes import FloppyInfoFromIMD, FloppyInfoFromName, FloppyInfoFromXML
+from util import get_git_version
 
 HXCFE_BINARY_PATH = Path('/home/sanqui/ha/HxCFloppyEmulator/build/hxcfe')
 WORKERS=16
@@ -245,6 +246,8 @@ def process_converted_disks(pyhxcfe_run_id: PyHXCFERunId, disk_captures_dir: Pat
     print(f"\nHTML summary generated: {output_file}")
     print(f"Total floppies: {len(floppy_summaries)}")
 
+    return [summary.summary_event for summary in floppy_summaries]
+
 
 @click.command()
 @click.argument(
@@ -286,7 +289,7 @@ def main(disk_captures_dir: Path, hxcfe_binary_path: Path, workers: int, redo: b
     DISK_CAPTURES_DIR: Directory containing floppy disk captures to process
     """
 
-    event_store = EventStore()
+    event_store = EventStore(namespace="hhfloppy", app="pyhxcfe")
 
     run_id = PyHXCFERunId(str(uuid.uuid7()))
 
@@ -349,17 +352,20 @@ def main(disk_captures_dir: Path, hxcfe_binary_path: Path, workers: int, redo: b
                         pbar.write(f"Failed to complete: {type(ex).__name__}: {ex}")
                     pbar.update(1)
         
-        for event in results:
-            event_store.emit_event(event)
+        event_store.emit_events(results)
 
     if output is None:
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         output = disk_captures_dir / f"summary_{timestamp}.html"
-    process_converted_disks(run_id, disk_captures_dir, output)
+    
+    events = process_converted_disks(run_id, disk_captures_dir, output)
+    event_store.emit_events(events)
 
     event_store.emit_event(PyHXCFEERunFinished(
         pyhxcfe_run_id=run_id
     ))
+
+    event_store.push()
 
 if __name__ == '__main__':
     main()
