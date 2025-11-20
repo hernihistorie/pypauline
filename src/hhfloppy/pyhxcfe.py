@@ -75,7 +75,7 @@ def convert_disk_capture_directory(pyhxcfe_run_id: PyHXCFERunId, hxcfe_binary_pa
             pyhxcfe_run_id=pyhxcfe_run_id,
             floppy_disk_capture_id=floppy_disk_capture_id,
             floppy_disk_capture_id_source='hashed_directory_name',
-            capture_directory=floppy_subdir.name,
+            floppy_disk_capture_directory=floppy_subdir.name,
             success=True,
             formats=[fmt for fmt, _ in FORMATS]
         )
@@ -356,6 +356,7 @@ def main(disk_captures_dir: Path, hxcfe_binary_path: Path, workers: int, redo: b
                         results.extend(result)
                     except Exception as ex:
                         pbar.write(f"Failed to complete: {type(ex).__name__}: {ex}")
+                        raise ex
                     pbar.update(1)
         
         event_store.emit_events(results)
