@@ -12,7 +12,7 @@ from .datatypes import FloppyInfoFromIMD, FloppyInfoFromName, FloppyInfoFromXML,
 class Event(HHFloppyTaggedStruct, kw_only=True, frozen=True):
     """Base class for events."""
 
-    event_version: int = 4
+    event_version: int = 5
     event_timestamp: datetime.datetime = field(default_factory=datetime.datetime.now)
     event_id: uuid.UUID = field(default_factory=uuid.uuid7)
 

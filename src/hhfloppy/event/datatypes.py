@@ -1,12 +1,11 @@
 from __future__ import annotations # Needed to fix https://github.com/jcrist/msgspec/issues/924
 
-from datetime import datetime
 from typing import Union
 
 import msgspec
 
 
-class HHFloppyTaggedStruct(msgspec.Struct, kw_only=True, frozen=True, tag_field="event_type", tag=True):
+class HHFloppyTaggedStruct(msgspec.Struct, kw_only=True, frozen=True, tag_field="type", tag=True):
     pass
 
 
@@ -50,4 +49,4 @@ HHFLOPPY_EVENT_DATA_CLASS_UNION = Union[
 
 # For sanity, try to make a decoder
 
-_event_decoder = msgspec.json.Decoder(HHFLOPPY_EVENT_DATA_CLASS_UNION)
+_decoder = msgspec.json.Decoder(HHFLOPPY_EVENT_DATA_CLASS_UNION)
