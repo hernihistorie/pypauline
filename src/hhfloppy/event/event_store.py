@@ -1,3 +1,4 @@
+import os
 import random
 from string import ascii_letters, digits
 import time
@@ -10,14 +11,16 @@ import msgspec
 from .events import Event
 
 PUSH_KEY_LENGTH = 24
-EVENT_STORE_API_ADDRESS = "http://127.0.0.1:5000/event_store"
+DEFAULT_EVENT_STORE_ADDRESS = "https://inventory.herniarchiv.cz/"
+EVENT_STORE_PATH = "event_store"
 
 class EventStore:
-    def __init__(self, namespace: str, app: str) -> None:
+    def __init__(self, namespace: str, app: str, event_store_address: str | None=None) -> None:
         """Initialize the event store."""
         self.namespace = namespace
         self.app = app
         self.events: list[Event] = []
+        self.event_store_url = (event_store_address or os.environ.get("EVENT_STORE_ADDRESS") or DEFAULT_EVENT_STORE_ADDRESS) + EVENT_STORE_PATH
 
     def emit_event(self, event: Event) -> None:
         """Emit an event."""
@@ -51,7 +54,7 @@ class EventStore:
 
         print()
         print("Please authorize this push by visiting the following URL in your browser:")
-        print(f"{EVENT_STORE_API_ADDRESS}/authorize?key={push_key}&namespace={self.namespace}&application_name={self.app}")
+        print(f"{self.event_store_url}/authorize?key={push_key}&namespace={self.namespace}&application_name={self.app}")
         print()
 
         time.sleep(2)
@@ -61,7 +64,7 @@ class EventStore:
         while not authorized:
             print(f"\rChecking authorization...  (attempt {attempts})", end="")
             response = requests.get(
-                f"{EVENT_STORE_API_ADDRESS}/check_key/",
+                f"{self.event_store_url}/check_key/",
                 params={"key": push_key, "namespace": self.namespace, "app": self.app},
                 timeout=5,
             )
@@ -84,7 +87,7 @@ class EventStore:
 
         while not finished:
             response = requests.post(
-                f"{EVENT_STORE_API_ADDRESS}/ingest/",
+                f"{self.event_store_url}/ingest/",
                 json=push_data,
                 timeout=10,
             )
