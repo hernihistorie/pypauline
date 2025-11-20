@@ -220,7 +220,7 @@ def process_converted_disks(pyhxcfe_run_id: PyHXCFERunId, disk_captures_dir: Pat
                 pyhxcfe_run_id=pyhxcfe_run_id,
                 floppy_disk_capture_id=floppy_disk_capture_id,
                 floppy_disk_capture_id_source='hashed_directory_name',
-                capture_directory=floppy_subdir.name,
+                floppy_disk_capture_directory=floppy_subdir.name,
                 name_info=name_info,
                 xml_info=xml_info,
                 imd_info=imd_info
@@ -297,7 +297,7 @@ def main(disk_captures_dir: Path, hxcfe_binary_path: Path, workers: int, redo: b
 
     event_store = EventStore(namespace="hhfloppy", app="pyhxcfe")
 
-    run_id = PyHXCFERunId(str(uuid.uuid7()))
+    run_id = PyHXCFERunId(uuid.uuid7())
 
     event_store.emit_event(PyHXCFEERunStarted(
         pyhxcfe_run_id=run_id,

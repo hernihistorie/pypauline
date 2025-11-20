@@ -12,14 +12,14 @@ from .datatypes import FloppyInfoFromIMD, FloppyInfoFromName, FloppyInfoFromXML,
 class Event(HHFloppyTaggedStruct, kw_only=True, frozen=True):
     """Base class for events."""
 
-    event_version: int = 3
+    event_version: int = 4
     event_timestamp: datetime.datetime = field(default_factory=datetime.datetime.now)
     event_id: uuid.UUID = field(default_factory=uuid.uuid7)
 
 class TestEvent(Event, kw_only=True, frozen=True):
     test_data: str
 
-PyHXCFERunId = NewType('PyHXCFERunId', str)
+PyHXCFERunId = NewType('PyHXCFERunId', uuid.UUID)
 
 # Add e.g. info.json here once implemented
 FloppyDiskCaptureIDSource = Literal['hashed_directory_name']
@@ -43,7 +43,7 @@ class FloppyDiskCaptureDirectoryConverted(Event, frozen=True):
     pyhxcfe_run_id: PyHXCFERunId
     floppy_disk_capture_id: uuid.UUID
     floppy_disk_capture_id_source: FloppyDiskCaptureIDSource
-    capture_directory: str
+    floppy_disk_capture_directory: str
     success: bool
     formats: list[str]
 
@@ -54,7 +54,7 @@ class FloppyDiskCaptureSummarized(Event, frozen=True):
     pyhxcfe_run_id: PyHXCFERunId
     floppy_disk_capture_id: uuid.UUID
     floppy_disk_capture_id_source: FloppyDiskCaptureIDSource
-    capture_directory: str
+    floppy_disk_capture_directory: str
 
     name_info: FloppyInfoFromName
     xml_info: FloppyInfoFromXML
