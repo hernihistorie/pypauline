@@ -1,15 +1,20 @@
 #!/usr/bin/env python3
-"""
-Simple test script to demonstrate OAuth2 device flow authentication for event pushing.
-"""
+import click
 
 from event.events import TestEvent
 from event.event_store import EventStore
 
-def main():
+@click.command()
+@click.option(
+    '--test-data',
+    type=str,
+    default="Hello world!",
+    help='Test text to include in the event'
+)
+def main(test_data: str):
     store = EventStore(namespace='hhfloppy', app='test_events.py')
     
-    test_event = TestEvent(test_data="Hello world!")
+    test_event = TestEvent(test_data=test_data)
     
     store.emit_event(test_event)
     
