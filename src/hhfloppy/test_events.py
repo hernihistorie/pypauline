@@ -7,7 +7,7 @@ from event.events import TestEvent
 from event.event_store import EventStore
 
 def main():
-    store = EventStore(namespace='test', app='test_app')
+    store = EventStore(namespace='hhfloppy', app='test_events.py')
     
     test_event = TestEvent(test_data="Hello world!")
     

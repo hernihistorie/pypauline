@@ -295,7 +295,7 @@ def main(disk_captures_dir: Path, hxcfe_binary_path: Path, workers: int, redo: b
     DISK_CAPTURES_DIR: Directory containing floppy disk captures to process
     """
 
-    event_store = EventStore(namespace="hhfloppy", app="pyhxcfe")
+    event_store = EventStore(namespace='hhfloppy', app="pyhxcfe")
 
     run_id = PyHXCFERunId(uuid.uuid7())
 

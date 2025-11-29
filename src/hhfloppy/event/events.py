@@ -10,13 +10,14 @@ from msgspec import field
 from .datatypes import HHFLOPPY_EVENT_DATA_CLASS_UNION, FloppyInfoFromIMD, FloppyInfoFromName, FloppyInfoFromXML, HHFloppyTaggedStruct
 
 EVENT_VERSION = 6
+EVENT_NAMESPACE = 'hhfloppy'
 
 class Event(HHFloppyTaggedStruct, kw_only=True, frozen=True):
     """Base class for events."""
 
     event_version: int = EVENT_VERSION
     event_timestamp: datetime.datetime = field(default_factory=datetime.datetime.now)
-    event_namespace: str = "hhfloppy"
+    event_namespace: str = EVENT_NAMESPACE
     event_id: uuid.UUID = field(default_factory=uuid.uuid7)
 
 class TestEvent(Event, kw_only=True, frozen=True):
