@@ -7,7 +7,7 @@ import uuid
 import msgspec
 from msgspec import field
 
-from .datatypes import FloppyInfoFromIMD, FloppyInfoFromName, FloppyInfoFromXML, HHFloppyTaggedStruct
+from .datatypes import HHFLOPPY_EVENT_DATA_CLASS_UNION, FloppyInfoFromIMD, FloppyInfoFromName, FloppyInfoFromXML, HHFloppyTaggedStruct
 
 class Event(HHFloppyTaggedStruct, kw_only=True, frozen=True):
     """Base class for events."""
@@ -77,4 +77,4 @@ HHFLOPPY_EVENT_CLASS_UNION = Union[
 
 # For sanity, try to make a decoder
 
-_event_decoder = msgspec.json.Decoder(HHFLOPPY_EVENT_CLASS_UNION)
+event_decoder = msgspec.json.Decoder(HHFLOPPY_EVENT_CLASS_UNION | HHFLOPPY_EVENT_DATA_CLASS_UNION)
